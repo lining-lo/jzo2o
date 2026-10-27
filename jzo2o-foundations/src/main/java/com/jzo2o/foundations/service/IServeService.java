@@ -6,6 +6,8 @@ import com.jzo2o.foundations.model.domain.Serve;
 import com.jzo2o.foundations.model.dto.request.ServePageQueryReqDTO;
 import com.jzo2o.foundations.model.dto.response.ServeResDTO;
 
+import java.math.BigDecimal;
+
 /**
  * 服务相关业务接口
  *
@@ -17,4 +19,11 @@ public interface IServeService extends IService<Serve> {
      * @return
      */
     PageResult<ServeResDTO> pageList(ServePageQueryReqDTO servePageQueryReqDTO);
+
+    /**
+     * 修改服务价格
+     * @param id
+     * @param price
+     */
+    void updatePrice(Long id, BigDecimal price);
 }
