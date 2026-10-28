@@ -76,12 +76,12 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
         for (ServeUpsertReqDTO dto : dtoList) {
             //1.判断服务项是否存在
             ServeItem item = serveItemService.getById(dto.getServeItemId());
-            if(ObjectUtils.isEmpty(item)) {
+            if (ObjectUtils.isEmpty(item)) {
                 throw new ForbiddenOperationException("服务项不存在不能添加");
             }
 
             //2.判断服务项是否未启动
-            if(item.getActiveStatus()!= FoundationStatusEnum.ENABLE.getStatus()) {
+            if (item.getActiveStatus() != FoundationStatusEnum.ENABLE.getStatus()) {
                 throw new ForbiddenOperationException("服务项未启动不能添加");
             }
 
@@ -89,7 +89,7 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
             Integer count = this.lambdaQuery().eq(Serve::getRegionId, dto.getRegionId())
                     .eq(Serve::getServeItemId, dto.getServeItemId())
                     .count();
-            if(count>0) {
+            if (count > 0) {
                 throw new ForbiddenOperationException("服务项不能重复添加");
             }
 
@@ -102,7 +102,7 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
 
             //6.新增区域服务信息
             boolean result = this.save(serve);
-            if(!result) {
+            if (!result) {
                 throw new DBException("添加服务项失败");
             }
         }
@@ -113,35 +113,64 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
     public void onSale(Long id) {
         //1.判断服务是否存在
         Serve serve = this.getById(id);
-        if(ObjectUtils.isEmpty(serve)){
+        if (ObjectUtils.isEmpty(serve)) {
             throw new ForbiddenOperationException("服务不存在，禁止上架");
         }
 
         //2.判断是否有区域
-        if(serve.getRegionId()==null) {
+        if (serve.getRegionId() == null) {
             throw new ForbiddenOperationException("区域未选，禁止上架");
         }
 
         //3.判断服务是否上架过
-        if(serve.getSaleStatus()==FoundationStatusEnum.ENABLE.getStatus()) {
+        if (serve.getSaleStatus() == FoundationStatusEnum.ENABLE.getStatus()) {
             throw new ForbiddenOperationException("不要重复上架");
         }
 
         //4.判断服务项是否存在
         ServeItem item = serveItemService.getById(serve.getServeItemId());
-        if(ObjectUtils.isEmpty(item)){
+        if (ObjectUtils.isEmpty(item)) {
             throw new ForbiddenOperationException("服务项不存在，禁止上架");
         }
 
         //5.判断服务项是否已启动
-        if(item.getActiveStatus()!=FoundationStatusEnum.ENABLE.getStatus()) {
+        if (item.getActiveStatus() != FoundationStatusEnum.ENABLE.getStatus()) {
             throw new ForbiddenOperationException("服务项未启用，禁止上架");
         }
 
         //6.修改状态为已上架
         boolean result = this.lambdaUpdate().set(Serve::getSaleStatus, FoundationStatusEnum.ENABLE.getStatus()).eq(Serve::getId, id).update();
-        if(!result) {
+        if (!result) {
             throw new DBException("服务上架失败");
+        }
+    }
+
+    /**
+     * 区域服务下架
+     *
+     * @param id
+     */
+    @Override
+    public void offSale(Long id) {
+        //1.判断服务是否存在
+        Serve serve = this.getById(id);
+        if (ObjectUtils.isEmpty(serve)) {
+            throw new ForbiddenOperationException("服务不存在，禁止下架");
+        }
+
+
+        //2.校验状态：不是上架状态，不能执行下架
+        if (!serve.getSaleStatus().equals(FoundationStatusEnum.ENABLE.getStatus())) {
+            throw new ForbiddenOperationException("服务不是上架状态，禁止重复下架");
+        }
+
+        //3.修改状态为已下架
+        boolean result = this.lambdaUpdate()
+                .set(Serve::getSaleStatus, FoundationStatusEnum.DISABLE.getStatus())
+                .eq(Serve::getId, id)
+                .update();
+        if (!result) {
+            throw new DBException("服务下架失败");
         }
     }
 

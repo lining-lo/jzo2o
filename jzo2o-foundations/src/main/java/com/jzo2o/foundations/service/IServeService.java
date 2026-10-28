@@ -42,4 +42,10 @@ public interface IServeService extends IService<Serve> {
      * @param id 服务id
      */
     void onSale(Long id);
+
+    /**
+     * 区域服务下架
+     * @param id
+     */
+    void offSale(Long id);
 }
