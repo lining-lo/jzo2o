@@ -7,6 +7,7 @@ import com.jzo2o.common.model.PageResult;
 import com.jzo2o.common.utils.BeanUtils;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.foundations.enums.FoundationStatusEnum;
+import com.jzo2o.foundations.enums.ServeHotEnum;
 import com.jzo2o.foundations.mapper.ServeMapper;
 import com.jzo2o.foundations.model.domain.Serve;
 import com.jzo2o.foundations.model.domain.ServeItem;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -171,6 +173,105 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
                 .update();
         if (!result) {
             throw new DBException("服务下架失败");
+        }
+    }
+
+    /**
+     * 设置热门
+     *
+     * @param id
+     */
+    @Override
+    public void onHot(Long id) {
+        //1.判断服务是否存在
+        Serve serve = this.getById(id);
+        if (ObjectUtils.isEmpty(serve)) {
+            throw new ForbiddenOperationException("服务不存在，操作失败");
+        }
+
+        //2.判断是否有区域
+        if (serve.getRegionId() == null) {
+            throw new ForbiddenOperationException("区域未选，操作失败");
+        }
+
+        // 判断是否已经是热门
+        if (ServeHotEnum.HOT.equals(serve.getIsHot())) {
+            throw new ForbiddenOperationException("该服务已经是热门，无需重复设置");
+        }
+
+        //3.判断服务是否上架
+        if (!FoundationStatusEnum.ENABLE.equals(serve.getSaleStatus())) {
+            throw new ForbiddenOperationException("服务未上架，操作失败");
+        }
+
+        //4.判断服务项是否存在
+        ServeItem item = serveItemService.getById(serve.getServeItemId());
+        if (ObjectUtils.isEmpty(item)) {
+            throw new ForbiddenOperationException("服务项不存在，操作失败");
+        }
+
+        //5.判断服务项是否已启用
+        if (!FoundationStatusEnum.ENABLE.equals(item.getActiveStatus())) {
+            throw new ForbiddenOperationException("服务项未启用，操作失败");
+        }
+
+        //6.修改状态为热门 + 设置热门时间
+        boolean result = this.lambdaUpdate()
+                .set(Serve::getIsHot, ServeHotEnum.HOT.getStatus())
+                .set(Serve::getHotTimeStamp, System.currentTimeMillis())
+                .eq(Serve::getId, id)
+                .update();
+        if (!result) {
+            throw new DBException("设置热门失败");
+        }
+    }
+
+    /**
+     * 取消热门
+     * @param id
+     */
+    @Override
+    public void offHot(Long id) {
+        //1.判断服务是否存在
+        Serve serve = this.getById(id);
+        if (ObjectUtils.isEmpty(serve)) {
+            throw new ForbiddenOperationException("服务不存在，操作失败");
+        }
+
+        //2.判断是否有区域
+        if (serve.getRegionId() == null) {
+            throw new ForbiddenOperationException("区域未选，操作失败");
+        }
+
+        // 判断是否已经是取消热门
+        if (ServeHotEnum.NOT_HOT.equals(serve.getIsHot())) {
+            throw new ForbiddenOperationException("该服务已经不是热门，无需重复设置");
+        }
+
+        //3.判断服务是否上架
+        if (!FoundationStatusEnum.ENABLE.equals(serve.getSaleStatus())) {
+            throw new ForbiddenOperationException("服务未上架，操作失败");
+        }
+
+        //4.判断服务项是否存在
+        ServeItem item = serveItemService.getById(serve.getServeItemId());
+        if (ObjectUtils.isEmpty(item)) {
+            throw new ForbiddenOperationException("服务项不存在，操作失败");
+        }
+
+        //5.判断服务项是否已启用
+        if (!FoundationStatusEnum.ENABLE.equals(item.getActiveStatus())) {
+            throw new ForbiddenOperationException("服务项未启用，操作失败");
+        }
+
+        //6.修改状态为取消热门
+        boolean result = this.lambdaUpdate()
+                .set(Serve::getIsHot, ServeHotEnum.NOT_HOT.getStatus())
+                .set(Serve::getHotTimeStamp, null)
+                .eq(Serve::getId, id)
+                .update();
+        if (!result) {
+            throw new DBException("设置热门失败");
         }
     }
 
