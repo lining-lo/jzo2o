@@ -35,4 +35,11 @@ public interface IServeService extends IService<Serve> {
      * @param serveUpsertReqDTOList 批量新增数据
      */
     void batchAdd(List<ServeUpsertReqDTO> serveUpsertReqDTOList);
+
+    /**
+     * 上架
+     *
+     * @param id 服务id
+     */
+    void onSale(Long id);
 }

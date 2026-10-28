@@ -107,4 +107,42 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
             }
         }
     }
+
+    @Transactional
+    @Override
+    public void onSale(Long id) {
+        //1.判断服务是否存在
+        Serve serve = this.getById(id);
+        if(ObjectUtils.isEmpty(serve)){
+            throw new ForbiddenOperationException("服务不存在，禁止上架");
+        }
+
+        //2.判断是否有区域
+        if(serve.getRegionId()==null) {
+            throw new ForbiddenOperationException("区域未选，禁止上架");
+        }
+
+        //3.判断服务是否上架过
+        if(serve.getSaleStatus()==FoundationStatusEnum.ENABLE.getStatus()) {
+            throw new ForbiddenOperationException("不要重复上架");
+        }
+
+        //4.判断服务项是否存在
+        ServeItem item = serveItemService.getById(serve.getServeItemId());
+        if(ObjectUtils.isEmpty(item)){
+            throw new ForbiddenOperationException("服务项不存在，禁止上架");
+        }
+
+        //5.判断服务项是否已启动
+        if(item.getActiveStatus()!=FoundationStatusEnum.ENABLE.getStatus()) {
+            throw new ForbiddenOperationException("服务项未启用，禁止上架");
+        }
+
+        //6.修改状态为已上架
+        boolean result = this.lambdaUpdate().set(Serve::getSaleStatus, FoundationStatusEnum.ENABLE.getStatus()).eq(Serve::getId, id).update();
+        if(!result) {
+            throw new DBException("服务上架失败");
+        }
+    }
+
 }

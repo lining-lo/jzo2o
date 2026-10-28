@@ -51,4 +51,13 @@ public class ServeController {
     public void add(@RequestBody List<ServeUpsertReqDTO> serveUpsertReqDTOList) {
         serveService.batchAdd(serveUpsertReqDTOList);
     }
+
+    @PutMapping("/onSale/{id}")
+    @ApiOperation("区域服务上架")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "id", value = "服务id", required = true, dataTypeClass = Long.class),
+    })
+    public void onSale(@PathVariable("id") Long id) {
+        serveService.onSale(id);
+    }
 }
