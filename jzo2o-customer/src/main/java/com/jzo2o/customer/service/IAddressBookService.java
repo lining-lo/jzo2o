@@ -1,11 +1,11 @@
 package com.jzo2o.customer.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.customer.model.domain.AddressBook;
 import com.jzo2o.customer.model.dto.request.AddressBookPageQueryReqDTO;
 import com.jzo2o.customer.model.dto.request.AddressBookUpsertReqDTO;
+import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.List;
 
@@ -18,7 +18,6 @@ import java.util.List;
  * @since 2023-07-06
  */
 public interface IAddressBookService extends IService<AddressBook> {
-
     /**
      * 地址薄新增
      *

@@ -1,5 +1,5 @@
 {
-  "appid": "wx95bfb1051f4f3571",
+  "appid": "wx0d30f2dd5fe6df15",
   "compileType": "miniprogram",
   "libVersion": "2.24.6",
   "packOptions": {
@@ -7,7 +7,7 @@
     "include": []
   },
   "setting": {
-    "urlCheck": true,
+    "urlCheck": false,
     "coverView": true,
     "es6": true,
     "postcss": true,

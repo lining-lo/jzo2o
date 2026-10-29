@@ -231,7 +231,7 @@
     /* 快应用特有相关 */
     "mp-weixin" : {
         /* 小程序特有相关 */
-        "appid" : "wx8634b2ce0fd609b2",
+        "appid" : "wx0d30f2dd5fe6df15",
         "setting" : {
             "urlCheck" : false,
             "minified" : true

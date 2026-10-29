@@ -1,6 +1,9 @@
 
+// 本地环境
+export const baseUrl = 'http://192.168.1.9:11500'
+
 // 测试环境
-export const baseUrl = 'https://jzo2o-api-test.itheima.net'
+//export const baseUrl = 'https://jzo2o-api-test.itheima.net'
 // http://172.17.2.58/api
 // https://jzo2o-api-test.itheima.net
 // 本地环境

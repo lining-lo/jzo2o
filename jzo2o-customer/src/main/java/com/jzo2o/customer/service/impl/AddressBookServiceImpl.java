@@ -2,13 +2,14 @@ package com.jzo2o.customer.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ObjectUtil;
-import cn.hutool.db.DbRuntimeException;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
 import com.jzo2o.api.publics.MapApi;
 import com.jzo2o.api.publics.dto.response.LocationResDTO;
-import com.jzo2o.common.expcetions.DBException;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.common.utils.BeanUtils;
 import com.jzo2o.common.utils.CollUtils;
@@ -38,7 +39,8 @@ import java.util.List;
  */
 @Service
 public class AddressBookServiceImpl extends ServiceImpl<AddressBookMapper, AddressBook> implements IAddressBookService {
-
+    @Resource
+    private AddressBookMapper addressBookMapper;
     @Resource
     private MapApi mapApi;
 
@@ -80,10 +82,7 @@ public class AddressBookServiceImpl extends ServiceImpl<AddressBookMapper, Addre
             // 纬度
             addressBook.setLat(NumberUtils.parseDouble(addressBookUpsertReqDTO.getLocation().split(",")[1]));
         }
-        boolean result = this.save(addressBook);
-        if(!result) {
-            throw new DbRuntimeException("地址薄新增失败");
-        }
+        addressBookMapper.insert(addressBook);
     }
 
     /**
@@ -117,10 +116,7 @@ public class AddressBookServiceImpl extends ServiceImpl<AddressBookMapper, Addre
             // 纬度
             addressBook.setLat(NumberUtils.parseDouble(locationDto.getLocation().split(",")[1]));
         }
-        boolean result = this.updateById(addressBook);
-        if(!result) {
-            throw new DBException("地址簿修改失败");
-        }
+        addressBookMapper.updateById(addressBook);
     }
 
     /**
@@ -129,9 +125,10 @@ public class AddressBookServiceImpl extends ServiceImpl<AddressBookMapper, Addre
      * @param userId 用户id
      */
     private void cancelDefault(Long userId) {
-        this.lambdaUpdate()
+        LambdaUpdateWrapper<AddressBook> updateWrapper = Wrappers.<AddressBook>lambdaUpdate()
                 .eq(AddressBook::getUserId, userId)
-                .set(AddressBook::getIsDefault, 0).update();
+                .set(AddressBook::getIsDefault, 0);
+        super.update(updateWrapper);
     }
 
     /**
@@ -151,10 +148,7 @@ public class AddressBookServiceImpl extends ServiceImpl<AddressBookMapper, Addre
         AddressBook addressBook = new AddressBook();
         addressBook.setId(id);
         addressBook.setIsDefault(flag);
-        boolean result = this.updateById(addressBook);
-        if(!result) {
-            throw new DBException("更新失败");
-        }
+        addressBookMapper.updateById(addressBook);
     }
 
     /**
@@ -166,8 +160,10 @@ public class AddressBookServiceImpl extends ServiceImpl<AddressBookMapper, Addre
     @Override
     public PageResult<AddressBookResDTO> page(AddressBookPageQueryReqDTO addressBookPageQueryReqDTO) {
         Page<AddressBook> page = PageUtils.parsePageQuery(addressBookPageQueryReqDTO, AddressBook.class);
-        this.lambdaQuery().eq(AddressBook::getUserId, UserContext.currentUserId()).page(page);
-        return PageUtils.toPage(page, AddressBookResDTO.class);
+
+        LambdaQueryWrapper<AddressBook> queryWrapper = Wrappers.<AddressBook>lambdaQuery().eq(AddressBook::getUserId, UserContext.currentUserId());
+        Page<AddressBook> serveTypePage = addressBookMapper.selectPage(page, queryWrapper);
+        return PageUtils.toPage(serveTypePage, AddressBookResDTO.class);
     }
 
     /**
@@ -177,11 +173,13 @@ public class AddressBookServiceImpl extends ServiceImpl<AddressBookMapper, Addre
      */
     @Override
     public AddressBookResDTO defaultAddress() {
-        AddressBook addressBook = this.lambdaQuery()
+        LambdaQueryWrapper<AddressBook> queryWrapper = Wrappers.<AddressBook>lambdaQuery()
                 .eq(AddressBook::getUserId, UserContext.currentUserId())
-                .eq(AddressBook::getIsDefault, 1).one();
+                .eq(AddressBook::getIsDefault, 1);
+        AddressBook addressBook = addressBookMapper.selectOne(queryWrapper);
         return BeanUtil.toBean(addressBook, AddressBookResDTO.class);
     }
+
     @Override
     public List<AddressBookResDTO> getByUserIdAndCity(Long userId, String city) {
 

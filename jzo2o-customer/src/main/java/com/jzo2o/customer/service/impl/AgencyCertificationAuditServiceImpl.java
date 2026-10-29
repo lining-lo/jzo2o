@@ -14,6 +14,7 @@ import com.jzo2o.customer.enums.CertificationStatusEnum;
 import com.jzo2o.customer.mapper.AgencyCertificationAuditMapper;
 import com.jzo2o.customer.model.domain.AgencyCertification;
 import com.jzo2o.customer.model.domain.AgencyCertificationAudit;
+import com.jzo2o.customer.model.domain.WorkerCertification;
 import com.jzo2o.customer.model.dto.AgencyCertificationUpdateDTO;
 import com.jzo2o.customer.model.dto.request.AgencyCertificationAuditAddReqDTO;
 import com.jzo2o.customer.model.dto.request.AgencyCertificationAuditPageQueryReqDTO;
@@ -56,8 +57,7 @@ public class AgencyCertificationAuditServiceImpl extends ServiceImpl<AgencyCerti
     public void applyCertification(AgencyCertificationAuditAddReqDTO agencyCertificationAuditAddReqDTO) {
         //1.新增申请资质认证记录
         AgencyCertificationAudit agencyCertificationAudit = BeanUtil.toBean(agencyCertificationAuditAddReqDTO, AgencyCertificationAudit.class);
-        this.save(agencyCertificationAudit);
-
+        baseMapper.insert(agencyCertificationAudit);
         //查询认证记录
         Long serveProviderId = agencyCertificationAuditAddReqDTO.getServeProviderId();
         AgencyCertification agencyCertification = agencyCertificationService.getById(serveProviderId);

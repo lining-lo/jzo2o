@@ -7,7 +7,7 @@ import cn.hutool.json.JSONUtil;
 //import cn.xiaozhibang.evaluation.sdk.core.TokenHelper;
 //import cn.xiaozhibang.evaluation.sdk.model.domain.CurrentUser;
 import com.jzo2o.common.constants.ErrorInfo;
-//import com.jzo2o.common.constants.UserType;
+import com.jzo2o.common.constants.UserType;
 import com.jzo2o.common.expcetions.CommonException;
 import com.jzo2o.common.model.CurrentUserInfo;
 import com.jzo2o.customer.properties.EvaluationProperties;
@@ -244,11 +244,11 @@ public class EvaluationHttpClient {
      */
     public String generateToken(CurrentUserInfo currentUserInfo) {
         //配置中心读取应用配置
-        String appId = evaluationProperties.getAppId();
-        String accessKeyId = evaluationProperties.getAccessKeyId();
-        String accessKeySecret = evaluationProperties.getAccessKeySecret();
-
-        //当前用户信息
+//        String appId = evaluationProperties.getAppId();
+//        String accessKeyId = evaluationProperties.getAccessKeyId();
+//        String accessKeySecret = evaluationProperties.getAccessKeySecret();
+//
+//        //当前用户信息
 //        CurrentUser currentUser = new CurrentUser();
 //        currentUser.setId(currentUserInfo.getId().toString());
 //        currentUser.setNickName(currentUserInfo.getName());
@@ -260,6 +260,6 @@ public class EvaluationHttpClient {
 //        } else {
 //            return TokenHelper.generateTokenOfUser(appId, accessKeyId, accessKeySecret, currentUser);
 //        }
-        return null;
+        return "";
     }
 }

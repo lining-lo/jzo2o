@@ -7,10 +7,12 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.jzo2o.common.enums.EnableStatusEnum;
 import com.jzo2o.common.model.CurrentUserInfo;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.customer.enums.CertificationStatusEnum;
 import com.jzo2o.customer.mapper.WorkerCertificationAuditMapper;
+import com.jzo2o.customer.model.domain.AgencyCertificationAudit;
 import com.jzo2o.customer.model.domain.WorkerCertification;
 import com.jzo2o.customer.model.domain.WorkerCertificationAudit;
 import com.jzo2o.customer.model.dto.WorkerCertificationUpdateDTO;
@@ -57,8 +59,7 @@ public class WorkerCertificationAuditServiceImpl extends ServiceImpl<WorkerCerti
         WorkerCertificationAudit workerCertificationAudit = BeanUtil.toBean(workerCertificationAuditAddReqDTO, WorkerCertificationAudit.class);
         //默认未审核
         workerCertificationAudit.setAuditStatus(0);
-        this.save(workerCertificationAudit);
-
+        baseMapper.insert(workerCertificationAudit);
         //查询认证记录
         Long serveProviderId = workerCertificationAuditAddReqDTO.getServeProviderId();
         WorkerCertification workerCertification = workerCertificationService.getById(serveProviderId);
