@@ -169,8 +169,8 @@ public class RegionServiceImpl extends ServiceImpl<RegionMapper, Region> impleme
                 .eq(Serve::getRegionId, id)
                 .eq(Serve::getSaleStatus, FoundationStatusEnum.ENABLE.getStatus())
                 .count();
-        if (count > 0) {
-            throw new ForbiddenOperationException("该区域下存在已上架服务，不能启用！");
+        if (count < 1) {
+            throw new ForbiddenOperationException("该区域下不存在上架服务，不能启用！");
         }
 
 
