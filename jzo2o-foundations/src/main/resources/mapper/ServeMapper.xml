@@ -24,5 +24,49 @@
             serve.region_id = #{regionId}
     </select>
 
+    <select id="getServeTypeAndServeList" resultMap="serveListResMap">
+
+        select type.id serve_type_id,
+               type.name serve_type_name,
+               type.serve_type_icon serve_type_icon,
+               type.sort_num serve_type_sort_num,
+               serve.city_code city_code,
+               serve.id id,
+               item.id serve_item_id,
+               item.name serve_item_name,
+               item.serve_item_icon serve_item_icon,
+               item.sort_num serve_item_sort_num
+        from serve
+                 inner join serve_item item on item.id=serve.serve_item_id
+                 inner join serve_type type on type.id=item.serve_type_id
+        where  serve.sale_status=2
+          and type.active_status=2
+          and item.active_status=2
+          and serve.region_id=#{regionId}
+        order by type.sort_num,item.sort_num
+    </select>
+
+    <!--手动的映射-->
+    <resultMap id="serveListResMap" type="com.jzo2o.foundations.model.dto.response.ServeCategoryResDTO">
+        <!--id映射主键字段-->
+        <id column="serve_type_id" property="serveTypeId"></id>
+        <!--result映射普通字段-->
+        <result column="serve_type_name" property="serveTypeName"></result>
+        <result column="serve_type_icon" property="serveTypeIcon"></result>
+        <result column="serve_type_sort_num" property="serveTypeSortNum"></result>
+        <result column="city_code" property="cityCode"></result>
+
+        <!--column 数据库中的字段名-->
+        <!--property 实体类中对应的属性 该关键字可以省略... -->
+        <!--ofType 是javaType中的单个对象类型-->
+        <collection property="serveResDTOList" ofType="com.jzo2o.foundations.model.dto.response.ServeSimpleResDTO">
+            <id column="id" property="id"></id>
+            <result column="serve_item_id" property="serveItemId"></result>
+            <result column="serve_item_name" property="serveItemName"></result>
+            <result column="serve_item_icon" property="serveItemIcon"></result>
+            <result column="serve_item_sort_num" property="serveItemSortNum"></result>
+        </collection>
+    </resultMap>
+
 
 </mapper>
