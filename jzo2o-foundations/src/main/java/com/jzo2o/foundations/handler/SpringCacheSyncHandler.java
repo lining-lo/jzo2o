@@ -49,7 +49,7 @@ public class SpringCacheSyncHandler {
     /**
      * 每日刷新开通区域列表缓存
      */
-    @XxlJob("activeRegionCacheSync")
+    @XxlJob("updateActiveRegionsCache")
     public void updateActiveRegionsCache(){
         log.info(">>>>>>>>>>>>>>>>>>>活动区域列表缓存更新任务开始执行>>>>>>>>>>>>>>>>>>>>>>>>");
         String redisKey = RedisConstants.CacheName.JZ_CACHE + "::" + "ACTIVE_REGIONS";

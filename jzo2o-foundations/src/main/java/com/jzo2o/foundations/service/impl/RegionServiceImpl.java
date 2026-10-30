@@ -46,7 +46,7 @@ public class RegionServiceImpl extends ServiceImpl<RegionMapper, Region> impleme
     private IConfigRegionService configRegionService;
     @Resource
     private CityDirectoryMapper cityDirectoryMapper;
-    @Autowired
+    @Resource
     private IServeService serveService;
 
 
@@ -101,7 +101,10 @@ public class RegionServiceImpl extends ServiceImpl<RegionMapper, Region> impleme
      * @param id 区域id
      */
     @Override
-    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = RedisConstants.CacheName.JZ_CACHE, key = "'ACTIVE_REGIONS'"),
+            @CacheEvict(value = RedisConstants.CacheName.SERVE_ICON, key = "#id")
+    })
     public void deleteById(Long id) {
         //区域信息
         Region region = baseMapper.selectById(id);
