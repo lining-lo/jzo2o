@@ -24,10 +24,13 @@ import java.util.List;
  * 下单服务类
  * </p>
  *
- * @author itcast
- * @since 2023-07-10
  */
 public interface IOrdersCreateService extends IService<Orders> {
 
-
+    /**
+     * 下单服务
+     * @param placeOrderReqDTO
+     * @return
+     */
+    PlaceOrderResDTO placeOrder(PlaceOrderReqDTO placeOrderReqDTO);
 }
