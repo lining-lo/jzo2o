@@ -33,4 +33,11 @@ public interface IOrdersCreateService extends IService<Orders> {
      * @return
      */
     PlaceOrderResDTO placeOrder(PlaceOrderReqDTO placeOrderReqDTO);
+
+    /**
+     * 生成唯一订单号（yyMMdd+13位自增序号）
+     *
+     * @return
+     */
+    public Long generateOrderId();
 }
