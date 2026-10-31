@@ -2,9 +2,11 @@ package com.jzo2o.orders.manager.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
+import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
 import com.jzo2o.orders.manager.client.CustomerClient;
+import com.jzo2o.orders.manager.client.FoundationsClient;
 import com.jzo2o.orders.manager.model.dto.request.PlaceOrderReqDTO;
 import com.jzo2o.orders.manager.model.dto.response.PlaceOrderResDTO;
 import com.jzo2o.orders.manager.service.IOrdersCreateService;
@@ -23,11 +25,14 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
     @Autowired
     private CustomerClient customerClient;
+    @Autowired
+    private FoundationsClient foundationsClient;
 
     @Override
     public PlaceOrderResDTO placeOrder(PlaceOrderReqDTO placeOrderReqDTO) {
 
         //1. 调用feign接口（foundations服务的）查询服务信息
+        ServeAggregationResDTO serve = foundationsClient.findServeDetailById(placeOrderReqDTO.getServeId());
 
         //2. 调用feign接口（customer服务的）查询地址信息
         AddressBookResDTO address = customerClient.findAddressDetailById(placeOrderReqDTO.getAddressBookId());
