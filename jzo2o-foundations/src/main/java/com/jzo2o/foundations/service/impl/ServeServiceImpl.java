@@ -6,11 +6,11 @@ import com.jzo2o.common.expcetions.ForbiddenOperationException;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.common.utils.BeanUtils;
 import com.jzo2o.common.utils.ObjectUtils;
+import com.jzo2o.foundations.constants.RedisConstants;
 import com.jzo2o.foundations.enums.FoundationStatusEnum;
 import com.jzo2o.foundations.enums.ServeHotEnum;
-import com.jzo2o.foundations.mapper.ServeMapper;
-import com.jzo2o.foundations.model.domain.Serve;
-import com.jzo2o.foundations.model.domain.ServeItem;
+import com.jzo2o.foundations.mapper.*;
+import com.jzo2o.foundations.model.domain.*;
 import com.jzo2o.foundations.model.dto.request.ServePageQueryReqDTO;
 import com.jzo2o.foundations.model.dto.request.ServeUpsertReqDTO;
 import com.jzo2o.foundations.model.dto.response.RegionResDTO;
@@ -20,6 +20,8 @@ import com.jzo2o.foundations.service.IServeItemService;
 import com.jzo2o.foundations.service.IServeService;
 import com.jzo2o.mysql.utils.PageHelperUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +42,51 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
     private IServeItemService serveItemService;
     @Autowired
     private IRegionService regionService;
+    @Autowired
+    private RegionMapper regionMapper;
+    @Autowired
+    private ServeItemMapper serveItemMapper;
+    @Autowired
+    private ServeTypeMapper serveTypeMapper;
+    @Autowired
+    private ServeSyncMapper serveSyncMapper;
+
+    /**
+     * 新增服务同步数据
+     *
+     * @param serveId 服务id
+     */
+    private void addServeSync(Long serveId) {
+        //服务信息
+        Serve serve = baseMapper.selectById(serveId);
+        //区域信息
+        Region region = regionMapper.selectById(serve.getRegionId());
+        //服务项信息
+        ServeItem serveItem = serveItemMapper.selectById(serve.getServeItemId());
+        //服务类型
+        ServeType serveType = serveTypeMapper.selectById(serveItem.getServeTypeId());
+
+        ServeSync serveSync = new ServeSync();
+        serveSync.setServeTypeId(serveType.getId());
+        serveSync.setServeTypeName(serveType.getName());
+        serveSync.setServeTypeIcon(serveType.getServeTypeIcon());
+        serveSync.setServeTypeImg(serveType.getImg());
+        serveSync.setServeTypeSortNum(serveType.getSortNum());
+
+        serveSync.setServeItemId(serveItem.getId());
+        serveSync.setServeItemIcon(serveItem.getServeItemIcon());
+        serveSync.setServeItemName(serveItem.getName());
+        serveSync.setServeItemImg(serveItem.getImg());
+        serveSync.setServeItemSortNum(serveItem.getSortNum());
+        serveSync.setUnit(serveItem.getUnit());
+        serveSync.setDetailImg(serveItem.getDetailImg());
+        serveSync.setPrice(serve.getPrice());
+
+        serveSync.setCityCode(region.getCityCode());
+        serveSync.setId(serve.getId());
+        serveSync.setIsHot(serve.getIsHot());
+        serveSyncMapper.insert(serveSync);
+    }
 
 
     /**
@@ -110,9 +157,15 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
         }
     }
 
+    /**
+     * 上架
+     *
+     * @param id 服务id
+     */
     @Transactional
     @Override
-    public void onSale(Long id) {
+    @CachePut(value = RedisConstants.CacheName.SERVE, key = "#id", cacheManager = RedisConstants.CacheManager.ONE_DAY)
+    public Serve onSale(Long id) {
         //1.判断服务是否存在
         Serve serve = this.getById(id);
         if (ObjectUtils.isEmpty(serve)) {
@@ -145,6 +198,11 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
         if (!result) {
             throw new DBException("服务上架失败");
         }
+
+        //添加同步表
+        addServeSync(id);
+
+        return baseMapper.selectById(id);
     }
 
     /**
@@ -153,13 +211,13 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
      * @param id
      */
     @Override
-    public void offSale(Long id) {
+    @CacheEvict(value = RedisConstants.CacheName.SERVE, key = "#id")
+    public Serve offSale(Long id) {
         //1.判断服务是否存在
         Serve serve = this.getById(id);
         if (ObjectUtils.isEmpty(serve)) {
             throw new ForbiddenOperationException("服务不存在，禁止下架");
         }
-
 
         //2.校验状态：不是上架状态，不能执行下架
         if (!serve.getSaleStatus().equals(FoundationStatusEnum.ENABLE.getStatus())) {
@@ -174,6 +232,11 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
         if (!result) {
             throw new DBException("服务下架失败");
         }
+
+        // 删除同步表的数据
+        serveSyncMapper.deleteById(id);
+
+        return baseMapper.selectById(id);
     }
 
     /**
@@ -228,6 +291,7 @@ public class ServeServiceImpl extends ServiceImpl<ServeMapper, Serve> implements
 
     /**
      * 取消热门
+     *
      * @param id
      */
     @Override

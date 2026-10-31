@@ -1,6 +1,7 @@
 package com.jzo2o.foundations.controller.operation;
 
 import com.jzo2o.common.model.PageResult;
+import com.jzo2o.foundations.model.domain.Serve;
 import com.jzo2o.foundations.model.dto.request.ServePageQueryReqDTO;
 import com.jzo2o.foundations.model.dto.request.ServeUpsertReqDTO;
 import com.jzo2o.foundations.model.dto.response.ServeResDTO;
@@ -57,8 +58,8 @@ public class ServeController {
     @ApiImplicitParams({
             @ApiImplicitParam(name = "id", value = "服务id", required = true, dataTypeClass = Long.class),
     })
-    public void onSale(@PathVariable("id") Long id) {
-        serveService.onSale(id);
+    public Serve onSale(@PathVariable("id") Long id) {
+        return serveService.onSale(id);
     }
 
     @DeleteMapping("/{id}")
@@ -75,8 +76,8 @@ public class ServeController {
     @ApiImplicitParams({
             @ApiImplicitParam(name = "id", value = "服务id", required = true, dataTypeClass = Long.class),
     })
-    public void offSale(@PathVariable("id") Long id) {
-        serveService.offSale(id);
+    public Serve offSale(@PathVariable("id") Long id) {
+       return serveService.offSale(id);
     }
 
     @PutMapping("/onHot/{id}")
