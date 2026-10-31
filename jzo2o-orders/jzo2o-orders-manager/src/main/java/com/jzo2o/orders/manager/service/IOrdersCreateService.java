@@ -40,4 +40,6 @@ public interface IOrdersCreateService extends IService<Orders> {
      * @return
      */
     public Long generateOrderId();
+
+    void add(Orders orders);
 }

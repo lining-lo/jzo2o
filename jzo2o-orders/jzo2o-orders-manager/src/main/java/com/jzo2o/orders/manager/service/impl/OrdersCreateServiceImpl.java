@@ -1,5 +1,6 @@
 package com.jzo2o.orders.manager.service.impl;
 
+import cn.hutool.db.DbRuntimeException;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
 import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,6 +43,8 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     private CustomerClient customerClient;
     @Autowired
     private FoundationsClient foundationsClient;
+    @Autowired
+    private IOrdersCreateService owner;
 
 
     /**
@@ -120,8 +124,16 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         orders.setRealPayAmount(orders.getTotalAmount().subtract(orders.getDiscountAmount()));//实际支付金额=订单总金额-优惠金额
 
         //4. 创建订单到订单表
-        this.save(orders);
+        owner.add(orders);
 
         return new PlaceOrderResDTO(orders.getId());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void add(Orders orders) {
+        boolean save = this.save(orders);
+        if (!save) {
+            throw new DbRuntimeException("下单失败");
+        }
     }
 }
