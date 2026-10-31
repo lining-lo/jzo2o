@@ -4,6 +4,9 @@ import com.jzo2o.foundations.model.dto.response.ServeSimpleResDTO;
 
 import java.util.List;
 
+/**
+ * @author itcast
+ */
 public interface ServeAggregationService {
 
     /**
@@ -14,5 +17,5 @@ public interface ServeAggregationService {
      * @param keyword     关键词
      * @return 服务列表
      */
-    List<ServeSimpleResDTO> search(String cityCode, Long serveTypeId, String keyword);
+    List<ServeSimpleResDTO> findServeList(String cityCode, Long serveTypeId, String keyword);
 }
