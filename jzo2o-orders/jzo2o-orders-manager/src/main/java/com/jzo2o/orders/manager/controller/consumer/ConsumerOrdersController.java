@@ -63,4 +63,14 @@ public class ConsumerOrdersController {
         return placeOrderResDTO;
     }
 
+    @PutMapping("/pay/{id}")
+    @ApiOperation("订单支付")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "id", value = "订单id", required = true, dataTypeClass = Long.class)
+    })
+    public OrdersPayResDTO pay(@PathVariable("id") Long id, @RequestBody OrdersPayReqDTO ordersPayReqDTO) {
+        OrdersPayResDTO pay = ordersCreateService.pay(id, ordersPayReqDTO);
+        return pay;
+    }
+
 }

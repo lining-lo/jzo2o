@@ -6,6 +6,7 @@ import com.jzo2o.api.market.dto.request.CouponUseBackReqDTO;
 import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
 import com.jzo2o.api.orders.dto.response.OrderResDTO;
 import com.jzo2o.api.orders.dto.response.OrderSimpleResDTO;
+import com.jzo2o.api.trade.dto.response.NativePayResDTO;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.common.model.msg.TradeStatusMsg;
 import com.jzo2o.orders.base.model.domain.Orders;
@@ -42,4 +43,21 @@ public interface IOrdersCreateService extends IService<Orders> {
     public Long generateOrderId();
 
     void add(Orders orders);
+
+    /**
+     * 订单支付
+     *
+     * @param id              订单id
+     * @param ordersPayReqDTO 订单支付请求体
+     * @return 订单支付响应体
+     */
+    OrdersPayResDTO pay(Long id, OrdersPayReqDTO ordersPayReqDTO);
+
+
+    /**
+     * 更新订单
+     * @param id
+     * @param nativePayResDTO
+     */
+    void updateOrders(Long id, NativePayResDTO nativePayResDTO);
 }

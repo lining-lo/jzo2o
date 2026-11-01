@@ -21,4 +21,9 @@ public class TradeProperties {
      * 微信支付商户id
      */
     private Long wechatEnterpriseId;
+
+    /**
+     * 业务唯一标识
+     */
+    private String productAppId;
 }

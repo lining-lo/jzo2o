@@ -4,8 +4,15 @@ import cn.hutool.db.DbRuntimeException;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
 import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
+import com.jzo2o.api.trade.NativePayApi;
+import com.jzo2o.api.trade.dto.request.NativePayReqDTO;
+import com.jzo2o.api.trade.dto.response.NativePayResDTO;
+import com.jzo2o.api.trade.enums.PayChannelEnum;
 import com.jzo2o.common.expcetions.BadRequestException;
+import com.jzo2o.common.expcetions.DBException;
+import com.jzo2o.common.utils.BeanUtils;
 import com.jzo2o.common.utils.DateUtils;
+import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
 import com.jzo2o.orders.base.enums.OrderPayStatusEnum;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
@@ -13,8 +20,11 @@ import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
 import com.jzo2o.orders.manager.client.CustomerClient;
 import com.jzo2o.orders.manager.client.FoundationsClient;
+import com.jzo2o.orders.manager.model.dto.request.OrdersPayReqDTO;
 import com.jzo2o.orders.manager.model.dto.request.PlaceOrderReqDTO;
+import com.jzo2o.orders.manager.model.dto.response.OrdersPayResDTO;
 import com.jzo2o.orders.manager.model.dto.response.PlaceOrderResDTO;
+import com.jzo2o.orders.manager.porperties.TradeProperties;
 import com.jzo2o.orders.manager.service.IOrdersCreateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +55,10 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     private FoundationsClient foundationsClient;
     @Autowired
     private IOrdersCreateService owner;
+    @Autowired
+    private TradeProperties tradeProperties;
+    @Autowired
+    private NativePayApi nativePayApi;
 
 
     /**
@@ -55,7 +69,7 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     @Override
     public Long generateOrderId() {
         Long serialNum = redisTemplate.opsForValue().increment(ORDER_SERIAL_NUM_KEY);
-        Long id =  DateUtils.getFormatDate(LocalDateTime.now(),"yyMMdd") * 10000000000000L + serialNum;
+        Long id = DateUtils.getFormatDate(LocalDateTime.now(), "yyMMdd") * 10000000000000L + serialNum;
         return id;
     }
 
@@ -69,13 +83,13 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     public PlaceOrderResDTO placeOrder(PlaceOrderReqDTO dto) {
         //1. 调用feign接口（foundations服务的）查询服务信息
         ServeAggregationResDTO serve = foundationsClient.findServeDetailById(dto.getServeId());
-        if(serve == null || serve.getSaleStatus()!=2) {
+        if (serve == null || serve.getSaleStatus() != 2) {
             throw new BadRequestException("非法服务");
         }
 
         //2. 调用feign接口（customer服务的）查询地址信息
         AddressBookResDTO address = customerClient.findAddressDetailById(dto.getAddressBookId());
-        if(address==null) {
+        if (address == null) {
             throw new BadRequestException("没有选择地址");
         }
 
@@ -136,4 +150,79 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
             throw new DbRuntimeException("下单失败");
         }
     }
+
+    /**
+     * 订单支付
+     *
+     * @param id
+     * @param dto
+     * @return
+     */
+    @Override
+    public OrdersPayResDTO pay(Long id, OrdersPayReqDTO dto) {
+        //1. 判断订单是否存在
+        Orders orders = this.getById(id);
+        if (orders == null) {
+            throw new BadRequestException("订单不存在");
+        }
+
+        //2. 判断订单是否已支付成功（支付状态和交易单号）
+        if (ObjectUtils.equals(orders.getPayStatus(), OrderPayStatusEnum.PAY_SUCCESS.getStatus())
+                && ObjectUtils.isNotNull(orders.getTradingOrderNo())) {
+            OrdersPayResDTO ordersPayResDTO = BeanUtils.copyBean(orders, OrdersPayResDTO.class);
+            ordersPayResDTO.setProductOrderNo(id);
+            return ordersPayResDTO;
+        }
+
+        //3. 调用支付服务的Feign接口，获取响应数据
+
+        //3.1 根据支付渠道获取商户号
+        Long enterpriseId = ObjectUtils.equals(dto.getTradingChannel(), PayChannelEnum.WECHAT_PAY) ? tradeProperties.getWechatEnterpriseId()
+                : tradeProperties.getAliEnterpriseId();
+
+        //3.2 判断是否更换过支付渠道 （订单已有支付渠道，且与本次请求参数的支付渠道不一样，就算更换过）
+        boolean changeChannel = false; //默认值：未更换
+        if (ObjectUtils.isNotNull(orders.getTradingChannel()) && ObjectUtils.notEqual(orders.getTradingChannel(), dto.getTradingChannel())) {
+            changeChannel = true;
+        }
+
+        //业务系统唯一标识
+        String productAppId = tradeProperties.getProductAppId();
+
+        //3.3 发起feign接口请求调用支付服务，获取响应数据
+        NativePayReqDTO nativePayReqDTO = new NativePayReqDTO();
+        nativePayReqDTO.setProductOrderNo(id); //业务系统订单号（订单表的订单ID值）
+        nativePayReqDTO.setEnterpriseId(enterpriseId);//商户号
+        nativePayReqDTO.setProductAppId(productAppId);//业务系统唯一标识
+        nativePayReqDTO.setChangeChannel(changeChannel);//是否更换过支付渠道
+        nativePayReqDTO.setMemo(orders.getServeItemName());//商品描述
+        //nativePayReqDTO.setTradingAmount(orders.getRealPayAmount());//订单金额：实际支付金额
+        nativePayReqDTO.setTradingAmount(BigDecimal.valueOf(0.01));
+        nativePayReqDTO.setTradingChannel(dto.getTradingChannel());//支付渠道
+
+        NativePayResDTO nativePayResDTO = nativePayApi.createDownLineTrading(nativePayReqDTO);
+        if (ObjectUtils.isNull(nativePayResDTO)) {
+            throw new BadRequestException("调用支付服务的支付接口失败");
+        }
+
+        //4. 更新订单表数据（支付渠道和交易单号） update orders set trading_channel=?,trading_order_no=? where id=?
+        owner.updateOrders(id, nativePayResDTO);
+
+        //5. 封装响应数据
+        OrdersPayResDTO ordersPayResDTO = BeanUtils.copyBean(nativePayResDTO, OrdersPayResDTO.class);
+        ordersPayResDTO.setPayStatus(orders.getPayStatus());
+        return ordersPayResDTO;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void updateOrders(Long orderId, NativePayResDTO nativePayResDTO) {
+        boolean result = this.lambdaUpdate().eq(Orders::getId, orderId)
+                .set(Orders::getTradingChannel, nativePayResDTO.getTradingChannel())
+                .set(Orders::getTradingOrderNo, nativePayResDTO.getTradingOrderNo())
+                .update();
+        if (!result) {
+            throw new DBException("支付失败");
+        }
+    }
 }
+
