@@ -13,10 +13,13 @@ import com.jzo2o.api.orders.dto.response.OrderSimpleResDTO;
 import com.jzo2o.api.trade.RefundRecordApi;
 import com.jzo2o.common.enums.EnableStatusEnum;
 import com.jzo2o.common.expcetions.BadRequestException;
+import com.jzo2o.common.expcetions.DBException;
 import com.jzo2o.common.utils.ObjectUtils;
+import com.jzo2o.mvc.utils.UserContext;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
+import com.jzo2o.orders.base.model.domain.OrdersCanceled;
 import com.jzo2o.orders.base.model.domain.OrdersRefund;
 import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
 import com.jzo2o.orders.manager.service.IOrdersCanceledService;
@@ -27,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -91,6 +95,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         return orderSimpleResDTOS;
 
     }
+
     /**
      * 根据订单id查询
      *
@@ -149,16 +154,38 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
 
         //3. 如果是未支付 - 取消订单
         if (status.equals(noPayStatus)) {
-            owner.cancelOrderByNoPay(dto.getId(), dto.getCancelReason());
+            owner.cancelOrderByNoPay(dto.getId(), dto.getCancelReason(), false);
         } else {
             //4. 如果是待派单 - 关闭订单且退款
 
         }
     }
 
-    @Override
-    public void cancelOrderByNoPay(Long orderId, String cancelReason) {
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelOrderByNoPay(Long orderId, String cancelReason, boolean isSystem) {
+        //1. 添加取消记录
+        OrdersCanceled ordersCanceled = new OrdersCanceled();
+        ordersCanceled.setId(orderId);//订单id
+        if(!isSystem){
+            ordersCanceled.setCancellerId(UserContext.currentUserId()); //取消人id
+            ordersCanceled.setCancellerType(UserContext.currentUser().getUserType());//取消人类型
+            ordersCanceled.setCancelerName(UserContext.currentUser().getName());//取消人姓名
+        }
+        ordersCanceled.setCancelReason(cancelReason);//取消原因
+        ordersCanceled.setCancelTime(LocalDateTime.now());//取消时间
+        boolean resultCancel = ordersCanceledService.save(ordersCanceled);
+        if(!resultCancel) {
+            throw new DBException("添加取消记录失败");
+        }
 
+        //2. 更新订单状态 update orders set order_status=? where id=?
+        boolean resultOrder = this.lambdaUpdate()
+                .eq(Orders::getId, orderId)
+                .set(Orders::getOrdersStatus, OrderStatusEnum.CANCELED.getStatus())
+                .update();
+        if(!resultOrder) {
+            throw new DBException("更新订单失败");
+        }
     }
 
     @Override

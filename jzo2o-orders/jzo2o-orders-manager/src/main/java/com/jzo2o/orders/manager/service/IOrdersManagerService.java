@@ -77,7 +77,7 @@ public interface IOrdersManagerService extends IService<Orders> {
      * @param orderId
      * @param cancelReason
      */
-    void cancelOrderByNoPay(Long orderId, String cancelReason);
+    void cancelOrderByNoPay(Long orderId, String cancelReason, boolean isSystem);
 
     /**
      * 取消派单中订单
