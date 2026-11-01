@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.jzo2o.api.market.dto.request.CouponUseBackReqDTO;
 import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
+import com.jzo2o.api.orders.dto.request.OrderCancelReqDTO;
 import com.jzo2o.api.orders.dto.response.OrderResDTO;
 import com.jzo2o.api.orders.dto.response.OrderSimpleResDTO;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.common.model.msg.TradeStatusMsg;
 import com.jzo2o.orders.base.model.domain.Orders;
+import com.jzo2o.orders.base.model.domain.OrdersRefund;
 import com.jzo2o.orders.manager.model.dto.OrderCancelDTO;
 import com.jzo2o.orders.manager.model.dto.request.OrderPageQueryReqDTO;
 import com.jzo2o.orders.manager.model.dto.request.OrdersPayReqDTO;
@@ -55,6 +57,7 @@ public interface IOrdersManagerService extends IService<Orders> {
      * @return 订单详情
      */
     OrderResDTO getDetail(Long id);
+
     /**
      * 订单评价
      *
@@ -62,4 +65,30 @@ public interface IOrdersManagerService extends IService<Orders> {
      */
     void evaluationOrder(Long ordersId);
 
+    /**
+     * 取消订单
+     *
+     * @param dto 取消订单模型
+     */
+    void cancel(OrderCancelReqDTO dto);
+
+    /**
+     * 取消未支付订单
+     * @param orderId
+     * @param cancelReason
+     */
+    void cancelOrderByNoPay(Long orderId, String cancelReason);
+
+    /**
+     * 取消派单中订单
+     * @param orders 订单实体
+     * @param cancelReason
+     */
+    void cancelOrderByDispatching(Orders orders, String cancelReason);
+
+    /**
+     * 订单退款处理
+     * @param ordersRefund 订单退款实体
+     */
+    void ordersRefundHandle(OrdersRefund ordersRefund);
 }

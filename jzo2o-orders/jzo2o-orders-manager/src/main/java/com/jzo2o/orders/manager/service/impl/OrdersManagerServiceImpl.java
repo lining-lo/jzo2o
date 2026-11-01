@@ -7,18 +7,27 @@ import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.jzo2o.api.orders.dto.request.OrderCancelReqDTO;
 import com.jzo2o.api.orders.dto.response.OrderResDTO;
 import com.jzo2o.api.orders.dto.response.OrderSimpleResDTO;
+import com.jzo2o.api.trade.RefundRecordApi;
 import com.jzo2o.common.enums.EnableStatusEnum;
+import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.utils.ObjectUtils;
+import com.jzo2o.orders.base.enums.OrderStatusEnum;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
+import com.jzo2o.orders.base.model.domain.OrdersRefund;
 import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
+import com.jzo2o.orders.manager.service.IOrdersCanceledService;
 import com.jzo2o.orders.manager.service.IOrdersManagerService;
+import com.jzo2o.orders.manager.service.IOrdersRefundService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static com.jzo2o.orders.base.constants.FieldConstants.SORT_BY;
@@ -34,6 +43,15 @@ import static com.jzo2o.orders.base.constants.FieldConstants.SORT_BY;
 @Slf4j
 @Service
 public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> implements IOrdersManagerService {
+
+    @Autowired
+    private IOrdersManagerService owner;
+    @Autowired
+    private IOrdersCanceledService ordersCanceledService;
+    @Autowired
+    private IOrdersRefundService ordersRefundService;
+    @Autowired
+    private RefundRecordApi refundRecordApi;
 
     @Override
     public List<Orders> batchQuery(List<Long> ids) {
@@ -106,4 +124,50 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
 //        orderStateMachine.changeStatus(orders.getUserId(), orders.getId().toString(), OrderStatusChangeEventEnum.EVALUATE, orderSnapshotDTO);
     }
 
+    /**
+     * 取消订单
+     *
+     * @param dto
+     */
+    @Override
+    public void cancel(OrderCancelReqDTO dto) {
+        //1. 判断订单是否存在
+        Orders orders = this.getById(dto.getId());
+        if (orders == null) {
+            throw new BadRequestException("订单不存在");
+        }
+
+        Integer status = orders.getOrdersStatus();
+
+        //2. 判断订单状态是否合法（必须是未支付或派单中）
+        Integer noPayStatus = OrderStatusEnum.NO_PAY.getStatus();
+        Integer dispatchingStatus = OrderStatusEnum.DISPATCHING.getStatus();
+        List<Integer> statusList = Arrays.asList(noPayStatus, dispatchingStatus);
+        if (!statusList.contains(status)) {
+            throw new BadRequestException("非法状态");
+        }
+
+        //3. 如果是未支付 - 取消订单
+        if (status.equals(noPayStatus)) {
+            owner.cancelOrderByNoPay(dto.getId(), dto.getCancelReason());
+        } else {
+            //4. 如果是待派单 - 关闭订单且退款
+
+        }
+    }
+
+    @Override
+    public void cancelOrderByNoPay(Long orderId, String cancelReason) {
+
+    }
+
+    @Override
+    public void cancelOrderByDispatching(Orders orders, String cancelReason) {
+
+    }
+
+    @Override
+    public void ordersRefundHandle(OrdersRefund ordersRefund) {
+
+    }
 }

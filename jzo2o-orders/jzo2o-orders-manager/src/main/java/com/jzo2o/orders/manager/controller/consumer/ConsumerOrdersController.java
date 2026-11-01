@@ -83,4 +83,10 @@ public class ConsumerOrdersController {
         OrdersPayResDTO ordersPayResDTO = ordersCreateService.getPayResultFromTradServer(id);
         return ordersPayResDTO;
     }
+
+    @PutMapping("/cancel")
+    @ApiOperation("取消订单")
+    public void cancel(@RequestBody OrderCancelReqDTO dto) {
+        ordersManagerService.cancel(dto);
+    }
 }
