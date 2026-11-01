@@ -73,4 +73,14 @@ public class ConsumerOrdersController {
         return pay;
     }
 
+    @GetMapping("/pay/{id}/result")
+    @ApiOperation("查询订单支付结果")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "id", value = "订单id", required = true, dataTypeClass = Long.class)
+    })
+    public OrdersPayResDTO payResult(@PathVariable("id") Long id) {
+        //支付结果
+        OrdersPayResDTO ordersPayResDTO = ordersCreateService.getPayResultFromTradServer(id);
+        return ordersPayResDTO;
+    }
 }

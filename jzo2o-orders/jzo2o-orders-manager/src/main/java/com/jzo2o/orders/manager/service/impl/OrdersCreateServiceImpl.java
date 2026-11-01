@@ -5,9 +5,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
 import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
 import com.jzo2o.api.trade.NativePayApi;
+import com.jzo2o.api.trade.TradingApi;
 import com.jzo2o.api.trade.dto.request.NativePayReqDTO;
 import com.jzo2o.api.trade.dto.response.NativePayResDTO;
+import com.jzo2o.api.trade.dto.response.TradingResDTO;
 import com.jzo2o.api.trade.enums.PayChannelEnum;
+import com.jzo2o.api.trade.enums.TradingStateEnum;
 import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.expcetions.DBException;
 import com.jzo2o.common.utils.BeanUtils;
@@ -59,7 +62,8 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     private TradeProperties tradeProperties;
     @Autowired
     private NativePayApi nativePayApi;
-
+    @Autowired
+    private TradingApi tradingApi;
 
     /**
      * 生成唯一订单号（yyMMdd+13位自增序号）
@@ -223,6 +227,62 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         if (!result) {
             throw new DBException("支付失败");
         }
+    }
+
+    /**
+     * 查询订单支付结果
+     *
+     * @param id
+     * @return
+     */
+    @Override
+    public OrdersPayResDTO getPayResultFromTradServer(Long id) {
+        //1.判断订单是否存在
+        Orders orders = this.getById(id);
+        if(orders==null) {
+            throw new BadRequestException("订单不存在");
+        }
+
+        //2.判断是否有交易单号
+        if(ObjectUtils.isNull(orders.getTradingOrderNo())) {
+            throw new BadRequestException("非法订单");
+        }
+
+        //3.判断是否支付成功
+        OrdersPayResDTO ordersPayResDTO = BeanUtils.copyBean(orders, OrdersPayResDTO.class);
+        ordersPayResDTO.setProductOrderNo(id);
+        if(ObjectUtils.equals(orders.getPayStatus(),OrderPayStatusEnum.PAY_SUCCESS.getStatus())) {
+            return ordersPayResDTO;
+        }
+
+        //4.调用支付服务Feign接口查询支付结果
+        TradingResDTO tradingResDTO = tradingApi.findTradResultByTradingOrderNo(orders.getTradingOrderNo());
+
+        //5.更新订单表信息（支付时间、第三方交易号、订单状态、支付状态）
+        //update orders set pay_time=?,transaction_id=?,order_status=?,pay_status=? where id=?
+        if(ObjectUtils.isNotNull(tradingResDTO) && ObjectUtils.equals(tradingResDTO.getTradingState(), TradingStateEnum.YJS)) {
+            owner.paySuccess(id,tradingResDTO.getTransactionId(),tradingResDTO.getPaySuccessTime());
+
+            //6.封装响应数据
+            ordersPayResDTO.setQrCode(tradingResDTO.getQrCode());//支付二维码图片地址
+            ordersPayResDTO.setPayStatus(OrderPayStatusEnum.PAY_SUCCESS.getStatus());//支付成功
+        }
+        return ordersPayResDTO;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void paySuccess(Long orderId,String transactionId,LocalDateTime payTime) {
+        boolean result = this.lambdaUpdate()
+                .eq(Orders::getId, orderId)
+                .set(Orders::getPayTime, payTime)
+                .set(Orders::getTransactionId, transactionId)
+                .set(Orders::getOrdersStatus, OrderStatusEnum.DISPATCHING.getStatus())
+                .set(Orders::getPayStatus, OrderPayStatusEnum.PAY_SUCCESS.getStatus())
+                .update();
+        if(!result){
+            throw new DBException("更新订单失败");
+        }
+
     }
 }
 

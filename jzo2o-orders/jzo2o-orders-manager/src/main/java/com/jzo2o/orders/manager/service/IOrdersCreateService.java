@@ -18,6 +18,7 @@ import com.jzo2o.orders.manager.model.dto.response.OperationOrdersDetailResDTO;
 import com.jzo2o.orders.manager.model.dto.response.OrdersPayResDTO;
 import com.jzo2o.orders.manager.model.dto.response.PlaceOrderResDTO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -60,4 +61,20 @@ public interface IOrdersCreateService extends IService<Orders> {
      * @param nativePayResDTO
      */
     void updateOrders(Long id, NativePayResDTO nativePayResDTO);
+
+    /**
+     * 请求支付服务查询支付结果
+     *
+     * @param id 订单id
+     * @return 订单支付结果
+     */
+    OrdersPayResDTO getPayResultFromTradServer(Long id);
+
+    /**
+     * 支付成功更新订单
+     * @param orderId
+     * @param transactionId
+     * @param payTime
+     */
+    void paySuccess(Long orderId, String transactionId, LocalDateTime payTime);
 }

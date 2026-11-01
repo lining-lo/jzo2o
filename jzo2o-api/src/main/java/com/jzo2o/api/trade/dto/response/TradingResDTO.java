@@ -77,4 +77,6 @@ public class TradingResDTO {
     protected LocalDateTime updated;
     @ApiModelProperty(value = "交易单状态【DFK待付款,FKZ付款中,QXDD取消订单,YJS已结算,MD免单,GZ挂账】")
     private TradingStateEnum tradingState;
+    @ApiModelProperty(value = "支付时间")
+    protected LocalDateTime paySuccessTime;
 }
