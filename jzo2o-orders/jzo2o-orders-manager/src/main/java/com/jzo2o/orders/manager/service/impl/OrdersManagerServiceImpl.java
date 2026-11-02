@@ -17,7 +17,9 @@ import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.expcetions.DBException;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
+import com.jzo2o.orders.base.config.OrderStateMachine;
 import com.jzo2o.orders.base.enums.OrderRefundStatusEnum;
+import com.jzo2o.orders.base.enums.OrderStatusChangeEventEnum;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
@@ -62,6 +64,8 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
     @Autowired
     @Lazy   // 解决自注入 + 代理问题
     private IOrdersManagerService ordersManagerService;
+    @Autowired
+    private OrderStateMachine orderStateMachine;
 
     @Override
     public List<Orders> batchQuery(List<Long> ids) {
@@ -216,15 +220,8 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
             throw new DBException("添加取消记录失败");
         }
 
-        //2. 更新订单状态 update orders set order_status=?,refund_status=? where id=?
-        boolean resultOrder = ordersManagerService.lambdaUpdate()
-                .eq(Orders::getId, orders.getId())
-                .set(Orders::getOrdersStatus, OrderStatusEnum.CLOSED.getStatus()) //已关闭
-                .set(Orders::getRefundStatus, RefundStatusEnum.SENDING.getCode()) //退款中
-                .update();
-        if(!resultOrder) {
-            throw new DBException("更新订单失败");
-        }
+        //2.调用状态机的变更状态方法（表明触发订单取消事件）
+        orderStateMachine.changeStatus(orders.getId().toString(), OrderStatusChangeEventEnum.CLOSE_DISPATCHING_ORDER);
 
         //3. 添加退款记录
         OrdersRefund ordersRefund = new OrdersRefund();
