@@ -11,6 +11,7 @@ import com.jzo2o.api.orders.dto.request.OrderCancelReqDTO;
 import com.jzo2o.api.orders.dto.response.OrderResDTO;
 import com.jzo2o.api.orders.dto.response.OrderSimpleResDTO;
 import com.jzo2o.api.trade.RefundRecordApi;
+import com.jzo2o.api.trade.enums.RefundStatusEnum;
 import com.jzo2o.common.enums.EnableStatusEnum;
 import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.expcetions.DBException;
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -56,6 +58,8 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
     private IOrdersRefundService ordersRefundService;
     @Autowired
     private RefundRecordApi refundRecordApi;
+    @Autowired
+    private IOrdersManagerService ordersManagerService;
 
     @Override
     public List<Orders> batchQuery(List<Long> ids) {
@@ -157,7 +161,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
             owner.cancelOrderByNoPay(dto.getId(), dto.getCancelReason(), false);
         } else {
             //4. 如果是待派单 - 关闭订单且退款
-
+            owner.cancelOrderByDispatching(orders, dto.getCancelReason());
         }
     }
 
@@ -188,9 +192,50 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         }
     }
 
+    /**
+     * 取消派单中订单
+     *
+     * @param orders
+     * @param cancelReason
+     */
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public void cancelOrderByDispatching(Orders orders, String cancelReason) {
+        //1. 添加取消记录
+        OrdersCanceled ordersCanceled = new OrdersCanceled();
+        ordersCanceled.setId(orders.getId());//订单id
+        ordersCanceled.setCancellerId(UserContext.currentUser().getId()); //取消人id
+        ordersCanceled.setCancellerType(UserContext.currentUser().getUserType());//取消人类型
+        ordersCanceled.setCancelerName(UserContext.currentUser().getName());//取消人姓名
+        ordersCanceled.setCancelReason(cancelReason);//取消原因
+        ordersCanceled.setCancelTime(LocalDateTime.now());//取消时间
+        boolean resultCancel = ordersCanceledService.save(ordersCanceled);
+        if(!resultCancel) {
+            throw new DBException("添加取消记录失败");
+        }
 
+        //2. 更新订单状态 update orders set order_status=?,refund_status=? where id=?
+        boolean resultOrder = ordersManagerService.lambdaUpdate()
+                .eq(Orders::getId, orders.getId())
+                .set(Orders::getOrdersStatus, OrderStatusEnum.CLOSED.getStatus()) //已关闭
+                .set(Orders::getRefundStatus, RefundStatusEnum.SENDING.getCode()) //退款中
+                .update();
+        if(!resultOrder) {
+            throw new DBException("更新订单失败");
+        }
+
+        //3. 添加退款记录
+        OrdersRefund ordersRefund = new OrdersRefund();
+        ordersRefund.setId(orders.getId());
+        ordersRefund.setTradingOrderNo(orders.getTradingOrderNo());
+        //ordersRefund.setRealPayAmount(orders.getRealPayAmount());
+        ordersRefund.setRealPayAmount(BigDecimal.valueOf(0.01));//由于前面测试支付都是0.01，这里为方便演示也只能写0.01。 不要使用new BigDecimal(double)，这种会精度丢失
+        boolean resultRefund = ordersRefundService.save(ordersRefund);
+        if(!resultRefund) {
+            throw new DBException("添加退款记录失败");
+        }
+
+        //TODO 4. 申请退款
     }
 
     @Override
