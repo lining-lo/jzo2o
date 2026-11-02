@@ -1,6 +1,8 @@
 package com.jzo2o.orders.base.model.dto;
 
 //import com.jzo2o.statemachine.core.StateMachineSnapshot;
+
+import com.jzo2o.statemachine.core.StateMachineSnapshot;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,7 +21,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderSnapshotDTO  {
+public class OrderSnapshotDTO extends StateMachineSnapshot {
     /**
      * 订单id
      */
@@ -54,6 +56,11 @@ public class OrderSnapshotDTO  {
      * 服务项图片
      */
     private String serveItemImg;
+
+    /**
+     * 第三方支付交易号
+     */
+    private String transactionId;
 
     /**
      * 服务单位
@@ -171,7 +178,6 @@ public class OrderSnapshotDTO  {
     private Long refundNo;
 
 
-
     /**
      * 支付渠道【支付宝、微信、现金、免单挂账】
      */
@@ -225,23 +231,23 @@ public class OrderSnapshotDTO  {
     private Integer evaluationStatus;
 
 
-//    @Override
-//    public String getSnapshotId() {
-//        return String.valueOf(id);
-//    }
-//
-//    @Override
-//    public Integer getSnapshotStatus() {
-//        return ordersStatus;
-//    }
-//
-//    @Override
-//    public void setSnapshotId(String snapshotId) {
-//        this.id = Long.parseLong(snapshotId);
-//    }
-//
-//    @Override
-//    public void setSnapshotStatus(Integer snapshotStatus) {
-//        this.ordersStatus = snapshotStatus;
-//    }
+    @Override
+    public String getSnapshotId() {
+        return String.valueOf(id);
+    }
+
+    @Override
+    public Integer getSnapshotStatus() {
+        return ordersStatus;
+    }
+
+    @Override
+    public void setSnapshotId(String snapshotId) {
+        this.id = Long.parseLong(snapshotId);
+    }
+
+    @Override
+    public void setSnapshotStatus(Integer snapshotStatus) {
+        this.ordersStatus = snapshotStatus;
+    }
 }

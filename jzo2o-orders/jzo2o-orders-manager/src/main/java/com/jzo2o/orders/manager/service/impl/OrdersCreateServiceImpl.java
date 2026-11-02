@@ -19,10 +19,12 @@ import com.jzo2o.common.utils.DateUtils;
 import com.jzo2o.common.utils.IdUtils;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
+import com.jzo2o.orders.base.config.OrderStateMachine;
 import com.jzo2o.orders.base.enums.OrderPayStatusEnum;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
+import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
 import com.jzo2o.orders.manager.client.CustomerClient;
 import com.jzo2o.orders.manager.client.FoundationsClient;
 import com.jzo2o.orders.manager.model.dto.request.OrdersPayReqDTO;
@@ -69,6 +71,8 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     private TradingApi tradingApi;
     @Autowired
     private RabbitClient rabbitClient;
+    @Autowired
+    private OrderStateMachine orderStateMachine;
 
     /**
      * 生成唯一订单号（yyMMdd+13位自增序号）
@@ -160,10 +164,12 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
     @Transactional(rollbackFor = Exception.class)
     public void add(Orders orders) {
-        boolean save = this.save(orders);
-        if (!save) {
-            throw new DbRuntimeException("下单失败");
+        boolean result = this.save(orders);
+        if(!result) {
+            throw new DBException("服务预约下单失败");
         }
+        OrderSnapshotDTO orderSnapshotDTO = BeanUtils.copyBean(orders,OrderSnapshotDTO.class);
+        orderStateMachine.start(null,orders.getId().toString(), orderSnapshotDTO);
     }
 
     /**
