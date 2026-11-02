@@ -1,7 +1,6 @@
 package com.jzo2o.orders.manager.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -24,12 +23,13 @@ import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
 import com.jzo2o.orders.base.model.domain.OrdersCanceled;
 import com.jzo2o.orders.base.model.domain.OrdersRefund;
-import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
 import com.jzo2o.orders.manager.service.IOrdersCanceledService;
 import com.jzo2o.orders.manager.service.IOrdersManagerService;
 import com.jzo2o.orders.manager.service.IOrdersRefundService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,14 +54,13 @@ import static com.jzo2o.orders.base.constants.FieldConstants.SORT_BY;
 public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> implements IOrdersManagerService {
 
     @Autowired
-    private IOrdersManagerService owner;
-    @Autowired
     private IOrdersCanceledService ordersCanceledService;
     @Autowired
     private IOrdersRefundService ordersRefundService;
     @Autowired
     private RefundRecordApi refundRecordApi;
     @Autowired
+    @Lazy   // 解决自注入 + 代理问题
     private IOrdersManagerService ordersManagerService;
 
     @Override
@@ -161,10 +160,10 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
 
         //3. 如果是未支付 - 取消订单
         if (status.equals(noPayStatus)) {
-            owner.cancelOrderByNoPay(dto.getId(), dto.getCancelReason(), false);
+            ordersManagerService.cancelOrderByNoPay(dto.getId(), dto.getCancelReason(), false);
         } else {
             //4. 如果是待派单 - 关闭订单且退款
-            owner.cancelOrderByDispatching(orders, dto.getCancelReason());
+            ordersManagerService.cancelOrderByDispatching(orders, dto.getCancelReason());
         }
     }
 
@@ -239,7 +238,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         }
 
         //4. 申请退款
-        owner.ordersRefundHandle(ordersRefund);
+        ordersManagerService.ordersRefundHandle(ordersRefund);
     }
 
     /**
@@ -247,6 +246,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
      *
      */
     @Override
+    @Async("taskExecutor") // 新增
     @Transactional(rollbackFor = Exception.class)
     public void ordersRefundHandle(OrdersRefund ordersRefund) {
 
@@ -276,7 +276,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         }
 
         //4.更新订单表退款字段信息（退款状态、支付服务退款订单号、第三方退款订单号）
-        boolean resultOrder = owner.lambdaUpdate()
+        boolean resultOrder = ordersManagerService.lambdaUpdate()
                 .eq(Orders::getId, ordersRefund.getId()) //更新条件
                 .ne(Orders::getRefundStatus, refundStatus)//更新条件
                 .set(Orders::getRefundStatus, refundStatus) //退款状态
