@@ -21,6 +21,7 @@ import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
 import com.jzo2o.orders.base.config.OrderStateMachine;
 import com.jzo2o.orders.base.enums.OrderPayStatusEnum;
+import com.jzo2o.orders.base.enums.OrderStatusChangeEventEnum;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
@@ -289,16 +290,14 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
     @Transactional(rollbackFor = Exception.class)
     public void paySuccess(Long orderId, String transactionId, LocalDateTime payTime) {
-        boolean result = this.lambdaUpdate()
-                .eq(Orders::getId, orderId)
-                .set(Orders::getPayTime, payTime)
-                .set(Orders::getTransactionId, transactionId)
-                .set(Orders::getOrdersStatus, OrderStatusEnum.DISPATCHING.getStatus())
-                .set(Orders::getPayStatus, OrderPayStatusEnum.PAY_SUCCESS.getStatus())
-                .update();
-        if (!result) {
-            throw new DBException("更新订单失败");
-        }
+        //构建快照数据
+        OrderSnapshotDTO orderSnapshotDTO = new OrderSnapshotDTO();
+        orderSnapshotDTO.setId(orderId);
+        orderSnapshotDTO.setTransactionId(transactionId);
+        orderSnapshotDTO.setPayTime(payTime);
+
+        //调用状态机的变更状态方法（表明触发支付成功事件）
+        orderStateMachine.changeStatus(orderId.toString(), OrderStatusChangeEventEnum.PAYED, orderSnapshotDTO);
 
     }
 }
