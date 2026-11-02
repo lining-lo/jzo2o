@@ -11,12 +11,14 @@ import com.jzo2o.api.orders.dto.request.OrderCancelReqDTO;
 import com.jzo2o.api.orders.dto.response.OrderResDTO;
 import com.jzo2o.api.orders.dto.response.OrderSimpleResDTO;
 import com.jzo2o.api.trade.RefundRecordApi;
+import com.jzo2o.api.trade.dto.response.ExecutionResultResDTO;
 import com.jzo2o.api.trade.enums.RefundStatusEnum;
 import com.jzo2o.common.enums.EnableStatusEnum;
 import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.expcetions.DBException;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
+import com.jzo2o.orders.base.enums.OrderRefundStatusEnum;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
@@ -35,6 +37,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static com.jzo2o.orders.base.constants.FieldConstants.SORT_BY;
 
@@ -235,11 +238,62 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
             throw new DBException("添加退款记录失败");
         }
 
-        //TODO 4. 申请退款
+        //4. 申请退款
+        owner.ordersRefundHandle(ordersRefund);
     }
 
+    /**
+     * 订单退款
+     *
+     */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void ordersRefundHandle(OrdersRefund ordersRefund) {
 
+        //1.调用支付服务的Feign接口进行退款申请
+        ExecutionResultResDTO executionResultResDTO = null;
+        try {
+            executionResultResDTO = refundRecordApi.refundTrading(ordersRefund.getTradingOrderNo(), ordersRefund.getRealPayAmount());
+        } catch (Exception e) {
+            log.error("[订单退款处理]退款申请接口调用失败，退款信息：{}，异常信息", ordersRefund, e);
+            throw new BadRequestException("[订单退款处理]退款申请接口调用失败");
+        }
+
+        //2.从响应结果中获取退款处理状态
+        Integer refundStatus = executionResultResDTO.getRefundStatus();
+
+        //3.如果是退款中，则再查询一次退款结果
+        if(ObjectUtils.equals(refundStatus, OrderRefundStatusEnum.REFUNDING.getStatus())) {
+            try {
+                TimeUnit.SECONDS.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            //再发起一次退款请求，就是查询退款结果了
+            executionResultResDTO = refundRecordApi.refundTrading(ordersRefund.getTradingOrderNo(), ordersRefund.getRealPayAmount());
+            refundStatus = executionResultResDTO.getRefundStatus();
+        }
+
+        //4.更新订单表退款字段信息（退款状态、支付服务退款订单号、第三方退款订单号）
+        boolean resultOrder = owner.lambdaUpdate()
+                .eq(Orders::getId, ordersRefund.getId()) //更新条件
+                .ne(Orders::getRefundStatus, refundStatus)//更新条件
+                .set(Orders::getRefundStatus, refundStatus) //退款状态
+                .set(Orders::getRefundNo, executionResultResDTO.getRefundNo()) //支付服务退款订单号
+                .set(Orders::getRefundId, executionResultResDTO.getRefundId()) //第三方退款订单号
+                .update();
+        if(!resultOrder){
+            log.error("[订单退款处理]订单表退款状态更新失败，退款信息：{}", ordersRefund);
+            return;
+        }
+
+        //5.删除退款记录
+        boolean resultRefund = ordersRefundService.removeById(ordersRefund.getId());
+        if(!resultRefund){
+            log.error("[订单退款处理]删除退款记录失败，退款信息：{}", ordersRefund);
+        }
+
+        log.info("[订单退款处理]退款处理成功，退款信息：{}，退款状态：{}", ordersRefund, refundStatus);
     }
 }
