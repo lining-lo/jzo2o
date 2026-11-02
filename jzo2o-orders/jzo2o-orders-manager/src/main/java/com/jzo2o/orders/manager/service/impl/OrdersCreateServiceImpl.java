@@ -11,10 +11,12 @@ import com.jzo2o.api.trade.dto.response.NativePayResDTO;
 import com.jzo2o.api.trade.dto.response.TradingResDTO;
 import com.jzo2o.api.trade.enums.PayChannelEnum;
 import com.jzo2o.api.trade.enums.TradingStateEnum;
+import com.jzo2o.common.constants.MqConstants;
 import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.expcetions.DBException;
 import com.jzo2o.common.utils.BeanUtils;
 import com.jzo2o.common.utils.DateUtils;
+import com.jzo2o.common.utils.IdUtils;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
 import com.jzo2o.orders.base.enums.OrderPayStatusEnum;
@@ -29,6 +31,7 @@ import com.jzo2o.orders.manager.model.dto.response.OrdersPayResDTO;
 import com.jzo2o.orders.manager.model.dto.response.PlaceOrderResDTO;
 import com.jzo2o.orders.manager.porperties.TradeProperties;
 import com.jzo2o.orders.manager.service.IOrdersCreateService;
+import com.jzo2o.rabbitmq.client.RabbitClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -64,6 +67,8 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     private NativePayApi nativePayApi;
     @Autowired
     private TradingApi tradingApi;
+    @Autowired
+    private RabbitClient rabbitClient;
 
     /**
      * 生成唯一订单号（yyMMdd+13位自增序号）
@@ -143,6 +148,12 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
         //4. 创建订单到订单表
         owner.add(orders);
+
+        //5. 生产延迟15分钟消费的消息
+        rabbitClient.sendMsg(MqConstants.Exchanges.ORDERS,
+                MqConstants.RoutingKeys.ORDERS_CANCEL_KEY,
+                orders.getId().toString(), 60000,//为了方便测试这里写了延迟60秒
+                IdUtils.getSnowflakeNextId(), false);
 
         return new PlaceOrderResDTO(orders.getId());
     }
@@ -239,19 +250,19 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     public OrdersPayResDTO getPayResultFromTradServer(Long id) {
         //1.判断订单是否存在
         Orders orders = this.getById(id);
-        if(orders==null) {
+        if (orders == null) {
             throw new BadRequestException("订单不存在");
         }
 
         //2.判断是否有交易单号
-        if(ObjectUtils.isNull(orders.getTradingOrderNo())) {
+        if (ObjectUtils.isNull(orders.getTradingOrderNo())) {
             throw new BadRequestException("非法订单");
         }
 
         //3.判断是否支付成功
         OrdersPayResDTO ordersPayResDTO = BeanUtils.copyBean(orders, OrdersPayResDTO.class);
         ordersPayResDTO.setProductOrderNo(id);
-        if(ObjectUtils.equals(orders.getPayStatus(),OrderPayStatusEnum.PAY_SUCCESS.getStatus())) {
+        if (ObjectUtils.equals(orders.getPayStatus(), OrderPayStatusEnum.PAY_SUCCESS.getStatus())) {
             return ordersPayResDTO;
         }
 
@@ -260,8 +271,8 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
         //5.更新订单表信息（支付时间、第三方交易号、订单状态、支付状态）
         //update orders set pay_time=?,transaction_id=?,order_status=?,pay_status=? where id=?
-        if(ObjectUtils.isNotNull(tradingResDTO) && ObjectUtils.equals(tradingResDTO.getTradingState(), TradingStateEnum.YJS)) {
-            owner.paySuccess(id,tradingResDTO.getTransactionId(),tradingResDTO.getPaySuccessTime());
+        if (ObjectUtils.isNotNull(tradingResDTO) && ObjectUtils.equals(tradingResDTO.getTradingState(), TradingStateEnum.YJS)) {
+            owner.paySuccess(id, tradingResDTO.getTransactionId(), tradingResDTO.getPaySuccessTime());
 
             //6.封装响应数据
             ordersPayResDTO.setQrCode(tradingResDTO.getQrCode());//支付二维码图片地址
@@ -271,7 +282,7 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void paySuccess(Long orderId,String transactionId,LocalDateTime payTime) {
+    public void paySuccess(Long orderId, String transactionId, LocalDateTime payTime) {
         boolean result = this.lambdaUpdate()
                 .eq(Orders::getId, orderId)
                 .set(Orders::getPayTime, payTime)
@@ -279,7 +290,7 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
                 .set(Orders::getOrdersStatus, OrderStatusEnum.DISPATCHING.getStatus())
                 .set(Orders::getPayStatus, OrderPayStatusEnum.PAY_SUCCESS.getStatus())
                 .update();
-        if(!result){
+        if (!result) {
             throw new DBException("更新订单失败");
         }
 

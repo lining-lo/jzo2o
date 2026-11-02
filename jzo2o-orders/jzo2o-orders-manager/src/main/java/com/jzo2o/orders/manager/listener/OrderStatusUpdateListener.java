@@ -5,8 +5,12 @@ import com.jzo2o.api.trade.enums.TradingStateEnum;
 import com.jzo2o.common.constants.MqConstants;
 import com.jzo2o.common.model.msg.TradeStatusMsg;
 import com.jzo2o.common.utils.CollUtils;
+import com.jzo2o.common.utils.ObjectUtils;
+import com.jzo2o.orders.base.enums.OrderStatusEnum;
+import com.jzo2o.orders.base.model.domain.Orders;
 import com.jzo2o.orders.manager.porperties.TradeProperties;
 import com.jzo2o.orders.manager.service.IOrdersCreateService;
+import com.jzo2o.orders.manager.service.IOrdersManagerService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.rabbit.annotation.Exchange;
@@ -24,10 +28,10 @@ public class OrderStatusUpdateListener {
 
     @Autowired
     private TradeProperties tradeProperties;
-
     @Autowired
     private IOrdersCreateService ordersCreateService;
-
+    @Autowired
+    private IOrdersManagerService ordersManagerService;
 
     @RabbitListener(bindings = @QueueBinding(value = @Queue(name = MqConstants.Queues.ORDERS_TRADE_UPDATE_STATUS),
             exchange = @Exchange(name = MqConstants.Exchanges.TRADE, type = ExchangeTypes.TOPIC),
@@ -50,4 +54,32 @@ public class OrderStatusUpdateListener {
         log.info("[订单状态变更]支付成功状态变更完毕>>>>>>");
     }
 
+    /**
+     * 未支付订单超时后自动取消
+     */
+    @RabbitListener(bindings = @QueueBinding(value = @Queue(name = MqConstants.Queues.ORDERS_CANCEL_QUEUE),
+            exchange = @Exchange(name = MqConstants.Exchanges.ORDERS, delayed = "true"),
+            key = MqConstants.RoutingKeys.ORDERS_CANCEL_KEY
+    ))
+    public void listenMsgForCancel(String id) {
+        //1.判断参数是否为空
+        if (id == null) {
+            return;
+        }
+
+        //2.判断订单是否存在
+        Orders orders = ordersManagerService.getById(Long.valueOf(id));
+        if (orders == null) {
+            return;
+        }
+
+        //3.判断订单状态是否未支付
+        if (!ObjectUtils.equals(orders.getOrdersStatus(), OrderStatusEnum.NO_PAY.getStatus())) {
+            return;
+        }
+
+        //4.取消订单
+        ordersManagerService.cancelOrderByNoPay(orders.getId(), "超时未支付自动取消", true);
+        log.info("[订单状态变更]订单超时自动取消状态变更完毕>>>>>>");
+    }
 }
