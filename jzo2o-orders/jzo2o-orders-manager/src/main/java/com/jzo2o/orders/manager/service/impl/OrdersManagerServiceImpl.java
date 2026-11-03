@@ -15,6 +15,8 @@ import com.jzo2o.api.trade.enums.RefundStatusEnum;
 import com.jzo2o.common.enums.EnableStatusEnum;
 import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.expcetions.DBException;
+import com.jzo2o.common.utils.BeanUtils;
+import com.jzo2o.common.utils.JsonUtils;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
 import com.jzo2o.orders.base.config.OrderStateMachine;
@@ -25,6 +27,7 @@ import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
 import com.jzo2o.orders.base.model.domain.OrdersCanceled;
 import com.jzo2o.orders.base.model.domain.OrdersRefund;
+import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
 import com.jzo2o.orders.manager.service.IOrdersCanceledService;
 import com.jzo2o.orders.manager.service.IOrdersManagerService;
 import com.jzo2o.orders.manager.service.IOrdersRefundService;
@@ -114,9 +117,9 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
      */
     @Override
     public OrderResDTO getDetail(Long id) {
-        Orders orders = queryById(id);
-        OrderResDTO orderResDTO = BeanUtil.toBean(orders, OrderResDTO.class);
-        return orderResDTO;
+        String snapshotCache = orderStateMachine.getCurrentSnapshotCache(id.toString());
+        OrderSnapshotDTO orderSnapshotDTO = JsonUtils.toBean(snapshotCache, OrderSnapshotDTO.class);
+        return BeanUtils.copyBean(orderSnapshotDTO, OrderResDTO.class);
     }
 
     /**
