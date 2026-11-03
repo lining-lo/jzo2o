@@ -16,10 +16,12 @@ import com.jzo2o.common.enums.EnableStatusEnum;
 import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.expcetions.DBException;
 import com.jzo2o.common.utils.BeanUtils;
+import com.jzo2o.common.utils.CollUtils;
 import com.jzo2o.common.utils.JsonUtils;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
 import com.jzo2o.orders.base.config.OrderStateMachine;
+import com.jzo2o.orders.base.constants.RedisConstants;
 import com.jzo2o.orders.base.enums.OrderRefundStatusEnum;
 import com.jzo2o.orders.base.enums.OrderStatusChangeEventEnum;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
@@ -31,6 +33,7 @@ import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
 import com.jzo2o.orders.manager.service.IOrdersCanceledService;
 import com.jzo2o.orders.manager.service.IOrdersManagerService;
 import com.jzo2o.orders.manager.service.IOrdersRefundService;
+import com.jzo2o.redis.helper.CacheHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -41,10 +44,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.jzo2o.orders.base.constants.FieldConstants.SORT_BY;
+import static com.jzo2o.orders.base.constants.RedisConstants.Ttl.ORDERS_PAGE_TTL;
 
 /**
  * <p>
@@ -69,6 +76,8 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
     private IOrdersManagerService ordersManagerService;
     @Autowired
     private OrderStateMachine orderStateMachine;
+    @Autowired
+    private CacheHelper cacheHelper;
 
     @Override
     public List<Orders> batchQuery(List<Long> ids) {
@@ -96,15 +105,39 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
                 .eq(ObjectUtils.isNotNull(ordersStatus), Orders::getOrdersStatus, ordersStatus)
                 .lt(ObjectUtils.isNotNull(sortBy), Orders::getSortBy, sortBy)
                 .eq(Orders::getUserId, currentUserId)
-                .eq(Orders::getDisplay, EnableStatusEnum.ENABLE.getStatus());
+                .eq(Orders::getDisplay, EnableStatusEnum.ENABLE.getStatus())
+                .select(Orders::getId) //只查ID
+                ;
         Page<Orders> queryPage = new Page<>();
         queryPage.addOrder(OrderItem.desc(SORT_BY));
         queryPage.setSearchCount(false);
 
         //2.查询订单列表
         Page<Orders> ordersPage = baseMapper.selectPage(queryPage, queryWrapper);
-        List<Orders> records = ordersPage.getRecords();
-        List<OrderSimpleResDTO> orderSimpleResDTOS = BeanUtil.copyToList(records, OrderSimpleResDTO.class);
+        List<Long> orderIdList = CollUtils.getFieldValues(ordersPage.getRecords(), Orders::getId);
+        if(CollUtils.isEmpty(orderIdList)) {
+            return CollUtils.emptyList();
+        }
+
+        //List<Orders> records = ordersPage.getRecords();
+
+        //先查询缓存，缓存没有再查询数据库
+        //参数1：redisKey的一部分
+        String redisKey = String.format(RedisConstants.RedisKey.ORDERS, currentUserId);
+        //参数2：订单id列表
+        //参数3：batchDataQueryExecutor 当缓存中没有时执行batchDataQueryExecutor从数据库查询
+        // batchDataQueryExecutor的方法：Map<K, T> execute(List<K> objectIds, Class<T> clazz); objectIds表示缓存中未匹配到的id，clazz指定map中value的数据类型
+        //参数4：返回List中的数据类型
+        //参数5：过期时间
+        List<OrderSimpleResDTO> orderSimpleResDTOS = cacheHelper.<Long, OrderSimpleResDTO>batchGet(redisKey, orderIdList, (noCacheIds, clazz) -> {
+            List<Orders> ordersList = batchQuery(noCacheIds);
+            if (CollUtils.isEmpty(ordersList)) {
+                //为了防止缓存穿透返回空数据
+                return new HashMap<>();
+            }
+            Map<Long, OrderSimpleResDTO> collect = ordersList.stream().collect(Collectors.toMap(Orders::getId, o -> BeanUtil.toBean(o, OrderSimpleResDTO.class)));
+            return collect;
+        }, OrderSimpleResDTO.class, ORDERS_PAGE_TTL);
         return orderSimpleResDTOS;
 
     }
@@ -179,7 +212,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         //1. 添加取消记录
         OrdersCanceled ordersCanceled = new OrdersCanceled();
         ordersCanceled.setId(orderId);//订单id
-        if(!isSystem){
+        if (!isSystem) {
             ordersCanceled.setCancellerId(UserContext.currentUserId()); //取消人id
             ordersCanceled.setCancellerType(UserContext.currentUser().getUserType());//取消人类型
             ordersCanceled.setCancelerName(UserContext.currentUser().getName());//取消人姓名
@@ -187,7 +220,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         ordersCanceled.setCancelReason(cancelReason);//取消原因
         ordersCanceled.setCancelTime(LocalDateTime.now());//取消时间
         boolean resultCancel = ordersCanceledService.save(ordersCanceled);
-        if(!resultCancel) {
+        if (!resultCancel) {
             throw new DBException("添加取消记录失败");
         }
 
@@ -196,7 +229,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
                 .eq(Orders::getId, orderId)
                 .set(Orders::getOrdersStatus, OrderStatusEnum.CANCELED.getStatus())
                 .update();
-        if(!resultOrder) {
+        if (!resultOrder) {
             throw new DBException("更新订单失败");
         }
     }
@@ -219,7 +252,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         ordersCanceled.setCancelReason(cancelReason);//取消原因
         ordersCanceled.setCancelTime(LocalDateTime.now());//取消时间
         boolean resultCancel = ordersCanceledService.save(ordersCanceled);
-        if(!resultCancel) {
+        if (!resultCancel) {
             throw new DBException("添加取消记录失败");
         }
 
@@ -233,7 +266,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         //ordersRefund.setRealPayAmount(orders.getRealPayAmount());
         ordersRefund.setRealPayAmount(BigDecimal.valueOf(0.01));//由于前面测试支付都是0.01，这里为方便演示也只能写0.01。 不要使用new BigDecimal(double)，这种会精度丢失
         boolean resultRefund = ordersRefundService.save(ordersRefund);
-        if(!resultRefund) {
+        if (!resultRefund) {
             throw new DBException("添加退款记录失败");
         }
 
@@ -263,7 +296,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         Integer refundStatus = executionResultResDTO.getRefundStatus();
 
         //3.如果是退款中，则再查询一次退款结果
-        if(ObjectUtils.equals(refundStatus, OrderRefundStatusEnum.REFUNDING.getStatus())) {
+        if (ObjectUtils.equals(refundStatus, OrderRefundStatusEnum.REFUNDING.getStatus())) {
             try {
                 TimeUnit.SECONDS.sleep(10);
             } catch (InterruptedException e) {
@@ -283,14 +316,14 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
                 .set(Orders::getRefundNo, executionResultResDTO.getRefundNo()) //支付服务退款订单号
                 .set(Orders::getRefundId, executionResultResDTO.getRefundId()) //第三方退款订单号
                 .update();
-        if(!resultOrder){
+        if (!resultOrder) {
             log.error("[订单退款处理]订单表退款状态更新失败，退款信息：{}", ordersRefund);
             return;
         }
 
         //5.删除退款记录
         boolean resultRefund = ordersRefundService.removeById(ordersRefund.getId());
-        if(!resultRefund){
+        if (!resultRefund) {
             log.error("[订单退款处理]删除退款记录失败，退款信息：{}", ordersRefund);
         }
 
