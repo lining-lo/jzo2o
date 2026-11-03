@@ -170,7 +170,7 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
             throw new DBException("服务预约下单失败");
         }
         OrderSnapshotDTO orderSnapshotDTO = BeanUtils.copyBean(orders,OrderSnapshotDTO.class);
-        orderStateMachine.start(null,orders.getId().toString(), orderSnapshotDTO);
+        orderStateMachine.start(orders.getUserId(),orders.getId().toString(), orderSnapshotDTO);
     }
 
     /**
@@ -296,8 +296,9 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         orderSnapshotDTO.setTransactionId(transactionId);
         orderSnapshotDTO.setPayTime(payTime);
 
+        Orders orders = this.getById(orderId);
         //调用状态机的变更状态方法（表明触发支付成功事件）
-        orderStateMachine.changeStatus(orderId.toString(), OrderStatusChangeEventEnum.PAYED, orderSnapshotDTO);
+        orderStateMachine.changeStatus(orders.getUserId(), orderId.toString(), OrderStatusChangeEventEnum.PAYED, orderSnapshotDTO);
 
     }
 }

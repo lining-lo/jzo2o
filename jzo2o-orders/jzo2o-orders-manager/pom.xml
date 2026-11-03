@@ -100,7 +100,10 @@
             <groupId>com.jzo2o</groupId>
             <artifactId>jzo2o-sentinel</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>com.jzo2o</groupId>
+            <artifactId>jzo2o-shardingsphere-jdbc</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

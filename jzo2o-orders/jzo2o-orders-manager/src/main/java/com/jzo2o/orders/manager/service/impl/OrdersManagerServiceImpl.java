@@ -221,7 +221,7 @@ public class OrdersManagerServiceImpl extends ServiceImpl<OrdersMapper, Orders> 
         }
 
         //2.调用状态机的变更状态方法（表明触发订单取消事件）
-        orderStateMachine.changeStatus(orders.getId().toString(), OrderStatusChangeEventEnum.CLOSE_DISPATCHING_ORDER);
+        orderStateMachine.changeStatus(orders.getUserId(), orders.getId().toString(), OrderStatusChangeEventEnum.CLOSE_DISPATCHING_ORDER);
 
         //3. 添加退款记录
         OrdersRefund ordersRefund = new OrdersRefund();
