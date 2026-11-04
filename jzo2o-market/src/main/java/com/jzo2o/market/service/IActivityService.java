@@ -38,7 +38,6 @@ public interface IActivityService extends IService<Activity> {
     void save(ActivitySaveReqDTO activitySaveReqDTO);
 
 
-
     /**
      * 更新活动状态，
      * 1.已经进行中但是状态未修改的订单变为进行中
@@ -52,4 +51,9 @@ public interface IActivityService extends IService<Activity> {
      * 2.活动中产生的未使用的优惠券作废
      */
     void revoke(Long id);
+
+    /**
+     * 活动预热
+     */
+    void preHeat();
 }

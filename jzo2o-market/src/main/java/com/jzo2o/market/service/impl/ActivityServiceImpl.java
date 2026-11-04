@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.common.utils.*;
+import com.jzo2o.market.constants.RedisConstants;
 import com.jzo2o.market.enums.ActivityStatusEnum;
 import com.jzo2o.market.mapper.ActivityMapper;
 import com.jzo2o.market.model.domain.Activity;
@@ -21,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import static com.jzo2o.market.enums.ActivityStatusEnum.*;
 
@@ -145,6 +148,35 @@ public class ActivityServiceImpl extends ServiceImpl<ActivityMapper, Activity> i
         // 2.未使用优惠券作废
         couponService.revoke(id);
 
+    }
+
+    /**
+     * 活动缓存处理
+     */
+    @Override
+    public void preHeat() {
+        //1.查询活动列表（30天内进行中的和待开始的），结果根据活动开始时间倒序
+        //select * from activity where status in (1,2)
+        // and distribute_start_time<date_add(now(),interval 30 day)
+        //  order by distribute_start_time desc
+
+        List<Activity> activityList = this.lambdaQuery()
+                .in(Activity::getStatus, NO_DISTRIBUTE.getStatus(), DISTRIBUTING.getStatus())
+                .lt(Activity::getDistributeStartTime, DateUtils.now().plusDays(30))
+                .orderByDesc(Activity::getDistributeStartTime)
+                .list();
+        if (CollUtils.isEmpty(activityList)) {
+            activityList = new ArrayList<>();
+        }
+
+        //2.转为前端需要的对象列表
+        List<ActivityInfoResDTO> activityInfoResDTOList = BeanUtils.copyToList(activityList, ActivityInfoResDTO.class);
+
+        //3.将对象列表转为JSON字符串
+        String activityListJSON = JsonUtils.toJsonStr(activityInfoResDTOList);
+
+        //4.保存到Redis缓存中（永不过期）
+        redisTemplate.opsForValue().set(RedisConstants.RedisKey.ACTIVITY_CACHE_LIST, activityListJSON);
     }
 
 }
