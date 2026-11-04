@@ -34,10 +34,13 @@ public class ActivityInfoResDTO {
     private Integer receiveNum;
     @ApiModelProperty("核销数量")
     private Integer writeOffNum;
+    @ApiModelProperty("库存数量")
+    private Integer stockNum;
     @ApiModelProperty("有效期天数")
     private Integer validityDays;
     @ApiModelProperty("创建时间")
     private LocalDateTime createTime;
     @ApiModelProperty("更新时间")
     private LocalDateTime updateTime;
+    private Integer remainNum;
 }

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.common.utils.*;
 import com.jzo2o.market.constants.RedisConstants;
+import com.jzo2o.market.constants.TabTypeConstants;
 import com.jzo2o.market.enums.ActivityStatusEnum;
 import com.jzo2o.market.mapper.ActivityMapper;
 import com.jzo2o.market.model.domain.Activity;
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.jzo2o.market.enums.ActivityStatusEnum.*;
 
@@ -179,4 +181,65 @@ public class ActivityServiceImpl extends ServiceImpl<ActivityMapper, Activity> i
         redisTemplate.opsForValue().set(RedisConstants.RedisKey.ACTIVITY_CACHE_LIST, activityListJSON);
     }
 
+    /**
+     * 查询活动列表（基于缓存，并实时同步活动状态）
+     *
+     * @param tabType
+     * @return
+     */
+    @Override
+    public List<ActivityInfoResDTO> queryForListFromCache(Integer tabType) {
+
+        //1.从redis中查询活动列表JSON字符串
+        Object activityObj = redisTemplate.opsForValue().get(RedisConstants.RedisKey.ACTIVITY_CACHE_LIST);
+        if (ObjectUtils.isNull(activityObj)) {
+            return CollUtils.emptyList();
+        }
+
+        //2.将JSON字符串转为对象列表
+        List<ActivityInfoResDTO> activityList = JsonUtils.toList(activityObj.toString(), ActivityInfoResDTO.class);
+
+        //3.遍历对象，筛选出用户要选的活动列表
+        //用户所选类型对应的活动状态
+        Integer selectStatus = ObjectUtils.equal(tabType, TabTypeConstants.SEIZING) ? DISTRIBUTING.getStatus() : NO_DISTRIBUTE.getStatus();
+        //活动中活动当前最实时的状态（可通过原始状态和原始数据的开始时间、结束时间一起算）
+
+        List<ActivityInfoResDTO> activityListSelect = activityList.stream()
+                .filter(x -> ObjectUtils.equals(selectStatus, getCurrentRealStatus(x.getStatus(), x.getDistributeStartTime(), x.getDistributeEndTime())))
+                .peek(x -> {
+                    x.setRemainNum(x.getStockNum());//优惠券剩余数量等于优惠券库存数量
+                    x.setStatus(selectStatus);
+                })
+                .collect(Collectors.toList());
+
+        return activityListSelect;
+    }
+
+
+    /**
+     * 获取活动实时状态
+     *
+     * @param originStatus
+     * @param distributeStartTime
+     * @param distributeEndTime
+     * @return
+     */
+    public Integer getCurrentRealStatus(Integer originStatus, LocalDateTime distributeStartTime, LocalDateTime distributeEndTime) {
+
+        if (ObjectUtils.equals(originStatus, NO_DISTRIBUTE.getStatus())
+                && distributeStartTime.isBefore(DateUtils.now())
+                && distributeEndTime.isAfter(DateUtils.now())
+        ) {
+            return DISTRIBUTING.getStatus(); //待开始状态的订单，时间已到，获取最新状态为发放中
+        } else if (ObjectUtils.equals(originStatus, NO_DISTRIBUTE.getStatus())
+                && distributeEndTime.isBefore(DateUtils.now())
+        ) {
+            return LOSE_EFFICACY.getStatus(); //待开始状态的订单，时间已过，获取最新状态为已失效
+        } else if (ObjectUtils.equals(originStatus, DISTRIBUTING.getStatus())
+                && distributeEndTime.isBefore(DateUtils.now())
+        ) {
+            return LOSE_EFFICACY.getStatus(); //进行中状态的订单，时间已过，获取最新状态为已失效
+        }
+        return originStatus;
+    }
 }

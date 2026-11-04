@@ -56,4 +56,12 @@ public interface IActivityService extends IService<Activity> {
      * 活动预热
      */
     void preHeat();
+
+    /**
+     * 用户端抢券列表分页查询活动信息
+     *
+     * @param tabType 页面类型
+     * @return
+     */
+    List<ActivityInfoResDTO> queryForListFromCache(Integer tabType);
 }
