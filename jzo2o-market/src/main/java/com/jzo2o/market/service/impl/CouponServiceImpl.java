@@ -13,6 +13,7 @@ import com.jzo2o.common.expcetions.CommonException;
 import com.jzo2o.common.expcetions.DBException;
 import com.jzo2o.common.model.PageResult;
 import com.jzo2o.common.utils.*;
+import com.jzo2o.market.constants.RedisConstants;
 import com.jzo2o.market.enums.ActivityStatusEnum;
 import com.jzo2o.market.enums.CouponStatusEnum;
 import com.jzo2o.market.mapper.CouponMapper;
@@ -155,5 +156,81 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
                 .eq(Coupon::getStatus, CouponStatusEnum.NO_USE.getStatus())
                 .le(Coupon::getValidityTime, DateUtils.now())
                 .update();
+    }
+
+    /**
+     * 抢券 （避免直接操作数据库，基于缓存和Lua）
+     *
+     * @param id
+     */
+    @Override
+    public void seizeCoupon(Long id) {
+        //1. 查询优惠券活动，判断是否存在
+        ActivityInfoResDTO activity = getActivityFromCache(id);
+        if(ObjectUtils.isNull(activity)) {
+            throw new CommonException("优惠券活动不存在");
+        }
+
+        //2.判断优惠券的状态是否有效（非发放中都不行）
+        Integer status = activityService.getCurrentRealStatus(activity.getStatus(), activity.getDistributeStartTime(), activity.getDistributeEndTime());
+        if(ObjectUtils.notEqual(status, ActivityStatusEnum.DISTRIBUTING.getStatus())) {
+            throw new CommonException("活动非法状态");
+        }
+
+        //3. 判断优惠券活动的时间段是否有效（未开始或已结束都不行）
+        if(DateUtils.now().isBefore(activity.getDistributeStartTime()) || DateUtils.now().isAfter(activity.getDistributeEndTime())) {
+            throw new CommonException("非法时间段");
+        }
+
+        //4. 准备Lua脚本的key和argv
+        Long activityId = id;//ARGV[1] 活动id
+        Long userId = UserContext.currentUser().getId(); //ARGV[2] 用户id
+        List keys = Arrays.asList(
+                //KEYS[1] 抢券同步队列 RedisKey
+                String.format(RedisConstants.RedisKey.COUPON_SEIZE_SYNC_QUEUE_NAME, activityId%10),
+                //KEYS[2] 优惠券活动库存 RedisKey
+                String.format(RedisConstants.RedisKey.COUPON_RESOURCE_STOCK, activityId%10),
+                //KEYS[3] 抢券成功队列 RedisKey
+                String.format(RedisConstants.RedisKey.COUPON_SEIZE_LIST, activityId, activityId%10)
+        );
+
+        //5. 调用lua脚本执行抢券处理
+        Object result = redisTemplate.execute(seizeCouponScript, keys, activityId, userId);
+
+        //6. 根据Lua脚本执行结果进行处理
+        if(ObjectUtils.isNull(result)) {
+            throw new CommonException("抢券失败");
+        }
+        Long code = Long.valueOf(result.toString());
+        if(code>0) {
+            return; //抢券成功
+        }
+        if(code==-1) {
+            throw new CommonException("限领一张");
+        }
+
+        if(code==-2 || code==-4) {
+            throw new CommonException("已抢光");
+        }
+
+        if(code==-3 || code==-5) {
+            throw new CommonException("抢券失败");
+        }
+
+    }
+
+    /**
+     * 根据活动id从缓存中找到对应活动信息
+     * @param id
+     * @return
+     */
+    private ActivityInfoResDTO getActivityFromCache(Long id) {
+        String activityRedisKey = RedisConstants.RedisKey.ACTIVITY_CACHE_LIST;
+        Object activityObject = redisTemplate.opsForValue().get(activityRedisKey);
+        if(ObjectUtils.isNull(activityObject)) {
+            return null;
+        }
+        List<ActivityInfoResDTO> activityInfoResDTOList = JsonUtils.toList(activityObject.toString(), ActivityInfoResDTO.class);
+        return activityInfoResDTOList.stream().filter(x->ObjectUtils.equals(x.getId(),id)).findFirst().orElse(null);
     }
 }

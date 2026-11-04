@@ -11,6 +11,7 @@ import com.jzo2o.market.model.dto.request.CouponOperationPageQueryReqDTO;
 import com.jzo2o.market.model.dto.request.SeizeCouponReqDTO;
 import com.jzo2o.market.model.dto.response.CouponInfoResDTO;
 
+import javax.validation.constraints.Null;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -61,4 +62,9 @@ public interface ICouponService extends IService<Coupon> {
      * 过期优惠券处理
      */
     void processExpireCoupon();
+
+    /**
+     * 抢券
+     */
+    void seizeCoupon(Long id);
 }

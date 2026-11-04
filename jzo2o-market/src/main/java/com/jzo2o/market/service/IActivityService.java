@@ -8,6 +8,7 @@ import com.jzo2o.market.model.dto.request.ActivitySaveReqDTO;
 import com.jzo2o.market.model.dto.response.ActivityInfoResDTO;
 import com.jzo2o.market.model.dto.response.SeizeCouponInfoResDTO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -64,4 +65,9 @@ public interface IActivityService extends IService<Activity> {
      * @return
      */
     List<ActivityInfoResDTO> queryForListFromCache(Integer tabType);
+
+    /**
+     * 获取活动实时状态
+     */
+    public Integer getCurrentRealStatus(Integer originStatus, LocalDateTime distributeStartTime, LocalDateTime distributeEndTime);
 }

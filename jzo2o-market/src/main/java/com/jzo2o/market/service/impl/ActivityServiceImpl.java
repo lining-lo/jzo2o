@@ -135,9 +135,7 @@ public class ActivityServiceImpl extends ServiceImpl<ActivityMapper, Activity> i
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void
-
-    revoke(Long id) {
+    public void revoke(Long id) {
         // 1.活动作废
         boolean update = lambdaUpdate()
                 .set(Activity::getStatus, ActivityStatusEnum.VOIDED.getStatus())
