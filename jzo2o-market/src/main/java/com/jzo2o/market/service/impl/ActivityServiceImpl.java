@@ -179,6 +179,32 @@ public class ActivityServiceImpl extends ServiceImpl<ActivityMapper, Activity> i
 
         //4.保存到Redis缓存中（永不过期）
         redisTemplate.opsForValue().set(RedisConstants.RedisKey.ACTIVITY_CACHE_LIST, activityListJSON);
+
+        //5.待生效的活动库存同步到Redis
+        activityList.stream()
+                .filter(x->ObjectUtils.equals(
+                        NO_DISTRIBUTE.getStatus(),
+                        getCurrentRealStatus(x.getStatus(),x.getDistributeStartTime(),x.getDistributeEndTime()))
+                )
+                .forEach(x->{
+                    String redisKey = String.format(RedisConstants.RedisKey.COUPON_RESOURCE_STOCK,x.getId()%10);
+                    Object hashKey = x.getId(); //活动ID
+                    Object value = x.getStockNum();//库存数量
+                    redisTemplate.opsForHash().put(redisKey, hashKey, value);
+                });
+
+        //6.进行中的活动但是没同步过Redis才执行同步
+        activityList.stream()
+                .filter(x->ObjectUtils.equals(
+                        DISTRIBUTING.getStatus(),
+                        getCurrentRealStatus(x.getStatus(),x.getDistributeStartTime(),x.getDistributeEndTime()))
+                )
+                .forEach(x->{
+                    String redisKey = String.format(RedisConstants.RedisKey.COUPON_RESOURCE_STOCK,x.getId()%10);
+                    Object hashKey = x.getId(); //活动ID
+                    Object value = x.getStockNum();//库存数量
+                    redisTemplate.opsForHash().putIfAbsent(redisKey, hashKey, value);
+                });
     }
 
     /**
