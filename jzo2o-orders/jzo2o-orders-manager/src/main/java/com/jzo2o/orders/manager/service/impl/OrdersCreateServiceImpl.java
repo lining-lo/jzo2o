@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
 import com.jzo2o.api.foundations.ServeApi;
 import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
+import com.jzo2o.api.market.CouponApi;
+import com.jzo2o.api.market.dto.request.CouponUseReqDTO;
 import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
+import com.jzo2o.api.market.dto.response.CouponUseResDTO;
 import com.jzo2o.api.trade.NativePayApi;
 import com.jzo2o.api.trade.TradingApi;
 import com.jzo2o.api.trade.dto.request.NativePayReqDTO;
@@ -79,6 +82,8 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     private ServeApi serveApi;
     @Autowired
     private MarketClient marketClient;
+    @Autowired
+    private CouponApi couponApi;
 
     /**
      * 生成唯一订单号（yyMMdd+13位自增序号）
@@ -157,7 +162,11 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         orders.setRealPayAmount(orders.getTotalAmount().subtract(orders.getDiscountAmount()));//实际支付金额=订单总金额-优惠金额
 
         //4. 创建订单到订单表
-        owner.add(orders);
+        if(ObjectUtils.isNotNull(dto.getCouponId())) {
+            owner.addWithCoupon(orders, dto.getCouponId()); //使用优惠券且创建订单
+        } else {
+            owner.add(orders); //没有使用优惠券直接创建订单
+        }
 
         //5. 生产延迟15分钟消费的消息
         rabbitClient.sendMsg(MqConstants.Exchanges.ORDERS,
@@ -321,6 +330,35 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         //3. 调用feign接口（market服务的）获取可用优惠券列表
         List<AvailableCouponsResDTO> couponsResDTOList = marketClient.getAvailable(totalAmount);
         return couponsResDTOList;
+    }
+
+    /**
+     * 核销优惠券且创建订单
+     *
+     * @param orders
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void addWithCoupon(Orders orders, Long couponId) {
+
+        //4.1 调用feign接口核销优惠券
+        CouponUseReqDTO couponUseReqDto = new CouponUseReqDTO();
+        couponUseReqDto.setId(couponId);
+        couponUseReqDto.setOrdersId(orders.getId());
+        couponUseReqDto.setTotalAmount(orders.getTotalAmount());
+        CouponUseResDTO use = couponApi.use(couponUseReqDto);
+
+        //4.2 设置订单优惠金额
+        orders.setDiscountAmount(use.getDiscountAmount());
+        orders.setRealPayAmount(orders.getTotalAmount().subtract(orders.getDiscountAmount()));//实际支付金额=订单总金额-优惠金额
+        boolean result = this.save(orders);
+        if(!result) {
+            throw new DBException("服务预约下单失败");
+        }
+
+        //4.3. 启动订单状态机
+        OrderSnapshotDTO orderSnapshotDTO = BeanUtils.copyBean(orders, OrderSnapshotDTO.class);
+        orderStateMachine.start(orders.getUserId(), orders.getId().toString(), orderSnapshotDTO);
     }
 }
 
