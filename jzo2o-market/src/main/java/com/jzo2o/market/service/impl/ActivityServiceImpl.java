@@ -266,4 +266,18 @@ public class ActivityServiceImpl extends ServiceImpl<ActivityMapper, Activity> i
         }
         return originStatus;
     }
+
+    /**
+     * 扣减库存数量
+     *
+     * @param activityId
+     */
+    @Override
+    public boolean decrStockNum(Long activityId) {
+        return this.lambdaUpdate()
+                .setSql("stock_num=stock_num-1")
+                .eq(Activity::getId, activityId)
+                .gt(Activity::getStockNum, 0)
+                .update();
+    }
 }

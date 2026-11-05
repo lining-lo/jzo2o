@@ -2,6 +2,7 @@ package com.jzo2o.market.handler;
 
 import com.jzo2o.market.service.IActivityService;
 import com.jzo2o.market.service.ICouponService;
+import com.jzo2o.market.task.SyncMessageTask;
 import com.jzo2o.redis.annotations.Lock;
 import com.jzo2o.redis.constants.RedisSyncQueueConstants;
 import com.jzo2o.redis.sync.SyncManager;
@@ -26,6 +27,9 @@ public class XxlJobHandler {
 
     @Resource
     private ICouponService couponService;
+
+    @Resource
+    private SyncMessageTask syncMessageTask;
 
     /**
      * 活动状态修改，
@@ -69,6 +73,19 @@ public class XxlJobHandler {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 抢券数据同步到优惠券表中并扣减库存，每分钟执行一次
+     */
+    @XxlJob("seizeCouponSyncJob")
+    public void seizeCouponSyncJob(){
+        log.info("[抢券结果同步任务]开始执行");
+        //开启10个线程，每个线程各处理一个同步队列的数据
+        for (int i = 0; i < 10; i++) {
+            syncMessageTask.batchHandeSyncMessage(i);
+        }
+        log.info("[抢券结果同步任务]执行完毕");
     }
 
 }

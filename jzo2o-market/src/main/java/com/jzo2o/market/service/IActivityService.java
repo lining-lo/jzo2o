@@ -70,4 +70,10 @@ public interface IActivityService extends IService<Activity> {
      * 获取活动实时状态
      */
     public Integer getCurrentRealStatus(Integer originStatus, LocalDateTime distributeStartTime, LocalDateTime distributeEndTime);
+
+    /**
+     * 扣减库存数量
+     * @param activityId
+     */
+    boolean decrStockNum(Long activityId);
 }
