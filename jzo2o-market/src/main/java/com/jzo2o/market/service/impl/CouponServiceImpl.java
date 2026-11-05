@@ -264,4 +264,77 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
                 .collect(Collectors.toList());
         return availableCouponsResDTOList;
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CouponUseResDTO use(CouponUseReqDTO dto) {
+        Long ordersId = dto.getOrdersId(); //订单id
+        BigDecimal totalAmount = dto.getTotalAmount();//总金额
+        Long couponId = dto.getId();//优惠券id
+
+        //1. 判断参数是否为空
+        if(ObjectUtils.isNull(ordersId) || ObjectUtils.isNull(totalAmount) || ObjectUtils.isNull(couponId)) {
+            throw new BadRequestException("非法参数");
+        }
+
+        //2. 判断是否我的优惠券
+        Coupon coupon = this.getById(couponId);
+        //2.1 优惠券是否存在
+        if(ObjectUtils.isNull(coupon)) {
+            throw new CommonException("优惠券不存在");
+        }
+
+        Long userId = UserContext.currentUserId();
+
+        //2.2 是否我的优惠券
+        if(ObjectUtils.notEqual(userId,coupon.getUserId())) {
+            throw new CommonException("只能核销自己的优惠券");
+        }
+
+        //2.3 优惠券是否未使用
+        if(ObjectUtils.notEqual(coupon.getStatus(),CouponStatusEnum.NO_USE.getStatus())) {
+            throw new CommonException("优惠券状态非法");
+        }
+
+        //2.4 优惠券是否还未过期
+        if(DateUtils.now().isAfter(coupon.getValidityTime())) {
+            throw new CommonException("优惠券已过期");
+        }
+
+        //2.5 总金额是否大于等于满减金额
+        if(coupon.getAmountCondition().compareTo(totalAmount)>0) {
+            throw new CommonException("满减金额不能超过订单总额");
+        }
+
+
+        //3. 更新优惠券 update coupon set status=2,order_id=?,use_time=? where id=?
+        boolean resultForCoupon = this.lambdaUpdate()
+                .eq(Coupon::getId, couponId)
+                .set(Coupon::getStatus, CouponStatusEnum.USED.getStatus())
+                .set(Coupon::getOrdersId, ordersId)
+                .set(Coupon::getUseTime, DateUtils.now())
+                .update();
+        if(!resultForCoupon) {
+            throw new CommonException("核销优惠券失败");
+        }
+
+        //4. 新增优惠券核销记录
+        CouponWriteOff couponWriteOff = new CouponWriteOff();
+        couponWriteOff.setOrdersId(ordersId);
+        couponWriteOff.setCouponId(couponId);
+        couponWriteOff.setActivityId(coupon.getActivityId());
+        couponWriteOff.setUserId(userId);
+        couponWriteOff.setWriteOffManName(coupon.getName());
+        couponWriteOff.setWriteOffManPhone(coupon.getUserPhone());
+        couponWriteOff.setWriteOffTime(DateUtils.now());
+        boolean resultForWriteOff = couponWriteOffService.save(couponWriteOff);
+        if(!resultForWriteOff) {
+            throw new CommonException("核销优惠券失败");
+        }
+
+        CouponUseResDTO couponUseResDTO = new CouponUseResDTO();
+        couponUseResDTO.setDiscountAmount(CouponUtils.calDiscountAmount(coupon,totalAmount));
+        return couponUseResDTO;
+
+    }
 }
