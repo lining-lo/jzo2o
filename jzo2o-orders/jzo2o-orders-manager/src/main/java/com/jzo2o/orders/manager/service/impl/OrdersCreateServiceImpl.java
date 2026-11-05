@@ -1,9 +1,10 @@
 package com.jzo2o.orders.manager.service.impl;
 
-import cn.hutool.db.DbRuntimeException;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
+import com.jzo2o.api.foundations.ServeApi;
 import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
+import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
 import com.jzo2o.api.trade.NativePayApi;
 import com.jzo2o.api.trade.TradingApi;
 import com.jzo2o.api.trade.dto.request.NativePayReqDTO;
@@ -28,6 +29,7 @@ import com.jzo2o.orders.base.model.domain.Orders;
 import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
 import com.jzo2o.orders.manager.client.CustomerClient;
 import com.jzo2o.orders.manager.client.FoundationsClient;
+import com.jzo2o.orders.manager.client.MarketClient;
 import com.jzo2o.orders.manager.model.dto.request.OrdersPayReqDTO;
 import com.jzo2o.orders.manager.model.dto.request.PlaceOrderReqDTO;
 import com.jzo2o.orders.manager.model.dto.response.OrdersPayResDTO;
@@ -43,8 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
-import static org.bouncycastle.asn1.x500.style.RFC4519Style.owner;
+import java.util.List;
 
 /**
  * <p>
@@ -74,6 +75,10 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     private RabbitClient rabbitClient;
     @Autowired
     private OrderStateMachine orderStateMachine;
+    @Autowired
+    private ServeApi serveApi;
+    @Autowired
+    private MarketClient marketClient;
 
     /**
      * 生成唯一订单号（yyMMdd+13位自增序号）
@@ -300,6 +305,22 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         //调用状态机的变更状态方法（表明触发支付成功事件）
         orderStateMachine.changeStatus(orders.getUserId(), orderId.toString(), OrderStatusChangeEventEnum.PAYED, orderSnapshotDTO);
 
+    }
+
+    @Override
+    public List<AvailableCouponsResDTO> getAvailableCoupons(Long serveId, Integer purNum) {
+        //1. 调用feign接口（foundations服务的）查询服务信息
+        ServeAggregationResDTO serve = foundationsClient.findServeDetailById(serveId);
+        if(serve==null || serve.getSaleStatus()!=2) {
+            throw new BadRequestException("非法服务");
+        }
+
+        //2. 计算总金额
+        BigDecimal totalAmount = serve.getPrice().multiply(BigDecimal.valueOf(purNum));
+
+        //3. 调用feign接口（market服务的）获取可用优惠券列表
+        List<AvailableCouponsResDTO> couponsResDTOList = marketClient.getAvailable(totalAmount);
+        return couponsResDTOList;
     }
 }
 
