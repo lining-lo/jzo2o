@@ -233,4 +233,35 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         List<ActivityInfoResDTO> activityInfoResDTOList = JsonUtils.toList(activityObject.toString(), ActivityInfoResDTO.class);
         return activityInfoResDTOList.stream().filter(x->ObjectUtils.equals(x.getId(),id)).findFirst().orElse(null);
     }
+
+    /**
+     * 获取可用优惠券列表
+     * @param totalAmount
+     * @return
+     */
+    @Override
+    public List<AvailableCouponsResDTO> getAvailable(BigDecimal totalAmount) {
+        //1.获取满足条件的优惠券列表
+        //条件：用户id、未使用、未过期、满减金额（门槛）<=总金额
+        List<Coupon> couponList = this.lambdaQuery()
+                .eq(Coupon::getUserId, UserContext.currentUserId())
+                .eq(Coupon::getStatus, CouponStatusEnum.NO_USE.getStatus())
+                .gt(Coupon::getValidityTime, DateUtils.now())
+                .le(Coupon::getAmountCondition, totalAmount)
+                .list();
+        if(CollUtils.isEmpty(couponList)){
+            return CollUtils.emptyList();
+        }
+
+
+        //2.对优惠券列表进一步优化
+        //优化：计算优惠金额、筛选合适的优惠券、转换类型、按照优惠金额倒序
+        List<AvailableCouponsResDTO> availableCouponsResDTOList = couponList.stream()
+                .peek(x -> x.setDiscountAmount(CouponUtils.calDiscountAmount(x, totalAmount)))
+                .filter(x -> x.getDiscountAmount().compareTo(new BigDecimal("0")) > 0 && x.getDiscountAmount().compareTo(totalAmount) <= 0)
+                .map(x -> BeanUtils.copyBean(x, AvailableCouponsResDTO.class))
+                .sorted(Comparator.comparing(AvailableCouponsResDTO::getDiscountAmount).reversed())
+                .collect(Collectors.toList());
+        return availableCouponsResDTOList;
+    }
 }

@@ -67,4 +67,11 @@ public interface ICouponService extends IService<Coupon> {
      * 抢券
      */
     void seizeCoupon(Long id);
+
+    /**
+     * 获取可用优惠券列表
+     * @param totalAmount
+     * @return
+     */
+    List<AvailableCouponsResDTO> getAvailable(BigDecimal totalAmount);
 }
