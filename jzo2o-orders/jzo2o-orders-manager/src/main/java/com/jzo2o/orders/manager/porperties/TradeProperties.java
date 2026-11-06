@@ -23,7 +23,7 @@ public class TradeProperties {
     private Long wechatEnterpriseId;
 
     /**
-     * 业务唯一标识
+     * 业务系统唯一标识
      */
     private String productAppId;
 }

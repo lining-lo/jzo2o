@@ -1,74 +1,74 @@
 package com.jzo2o.orders.manager.service;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.jzo2o.api.market.dto.request.CouponUseBackReqDTO;
-import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
-import com.jzo2o.api.orders.dto.response.OrderResDTO;
-import com.jzo2o.api.orders.dto.response.OrderSimpleResDTO;
 import com.jzo2o.api.trade.dto.response.NativePayResDTO;
-import com.jzo2o.common.model.PageResult;
-import com.jzo2o.common.model.msg.TradeStatusMsg;
 import com.jzo2o.orders.base.model.domain.Orders;
-import com.jzo2o.orders.manager.model.dto.OrderCancelDTO;
-import com.jzo2o.orders.manager.model.dto.request.OrderPageQueryReqDTO;
 import com.jzo2o.orders.manager.model.dto.request.OrdersPayReqDTO;
 import com.jzo2o.orders.manager.model.dto.request.PlaceOrderReqDTO;
-import com.jzo2o.orders.manager.model.dto.response.OperationOrdersDetailResDTO;
 import com.jzo2o.orders.manager.model.dto.response.OrdersPayResDTO;
 import com.jzo2o.orders.manager.model.dto.response.PlaceOrderResDTO;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * <p>
  * 下单服务类
  * </p>
  *
+ * @author itcast
+ * @since 2023-07-10
  */
 public interface IOrdersCreateService extends IService<Orders> {
 
-    /**
-     * 下单服务
-     * @param placeOrderReqDTO
-     * @return
-     */
-    PlaceOrderResDTO placeOrder(PlaceOrderReqDTO placeOrderReqDTO);
 
     /**
-     * 生成唯一订单号（yyMMdd+13位自增序号）
-     *
+     * 预约下单
+     * @param dto
      * @return
      */
-    public Long generateOrderId();
+    PlaceOrderResDTO placeOrder(PlaceOrderReqDTO dto);
 
+    /**
+     * 生成唯一订单ID（订单号）： 年月日+13位自增序列号，长度共计19位
+     * @return
+     */
+    Long generateOrderId();
+
+    /**
+     * 保存订单
+     * @param orders
+     */
     void add(Orders orders);
 
     /**
-     * 订单支付
-     *
-     * @param id              订单id
-     * @param ordersPayReqDTO 订单支付请求体
-     * @return 订单支付响应体
+     * 保存订单且核销优惠券
+     * @param orders
      */
-    OrdersPayResDTO pay(Long id, OrdersPayReqDTO ordersPayReqDTO);
+    void addWithCoupon(Orders orders,Long couponId);
+
+    /**
+     * 订单支付
+     * @param id
+     * @param dto
+     * @return
+     */
+    OrdersPayResDTO pay(Long id, OrdersPayReqDTO dto);
 
 
     /**
      * 更新订单
-     * @param id
+     * @param orderId
      * @param nativePayResDTO
      */
-    void updateOrders(Long id, NativePayResDTO nativePayResDTO);
+    void updateOrders(Long orderId, NativePayResDTO nativePayResDTO);
 
     /**
-     * 请求支付服务查询支付结果
-     *
-     * @param id 订单id
-     * @return 订单支付结果
+     * 查询订单支付结果
+     * @param id
+     * @return
      */
-    OrdersPayResDTO getPayResultFromTradServer(Long id);
+    OrdersPayResDTO payResult(Long id);
+
 
     /**
      * 支付成功更新订单
@@ -77,20 +77,4 @@ public interface IOrdersCreateService extends IService<Orders> {
      * @param payTime
      */
     void paySuccess(Long orderId, String transactionId, LocalDateTime payTime);
-
-    /**
-     * 获取可用优惠券
-     *
-     * @param serveId 服务id
-     * @param purNum  购买数量
-     * @return 可用优惠券列表
-     */
-    List<AvailableCouponsResDTO> getAvailableCoupons(Long serveId, Integer purNum);
-
-    /**
-     * 使用优惠券下单
-     * @param orders 订单信息
-     * @param couponId 优惠券id
-     */
-    public void addWithCoupon(Orders orders, Long couponId);
 }

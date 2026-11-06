@@ -13,37 +13,38 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * 订单状态变更事件动作处理类
+ * 订单支付成功事件触发的动作处理类
+ *
+ * @Author mr.wu
+ * @Date 2024-12-17 9:48
  */
 @Slf4j
-@Component("order_payed")
+@Component("order_payed") //动作处理类的Bean名称命名规则：状态机名_事件名
 public class OrderPayedHandler implements StatusChangeHandler<OrderSnapshotDTO> {
 
     @Autowired
     private IOrdersCommonService ordersCommonService;
 
+
     /**
-     * 支付成功状态变更
-     * @param bizId 订单id
-     * @param statusChangeEventEnum 订单状态变更事件枚举类
-     * @param bizSnapshot 订单快照
+     * 状态变更处理逻辑
+     * @param bizId
+     * @param statusChangeEventEnum
+     * @param bizSnapshot
      */
     @Override
     public void handler(String bizId, StatusChangeEvent statusChangeEventEnum, OrderSnapshotDTO bizSnapshot) {
-        log.info("订单支付成功，订单状态开始变更，订单ID：{}", bizId);
-
+        log.info("支付成功事件，触发状态变更，开始变更：{}", bizId);
         boolean result = ordersCommonService.lambdaUpdate()
-                .eq(Orders::getId, Long.valueOf(bizId))
+                .eq(Orders::getId, bizSnapshot.getId())
                 .set(Orders::getPayTime, bizSnapshot.getPayTime())
-                .set(Orders::getTransactionId, bizSnapshot.getTransactionId())
+                .set(Orders::getTransactionId, bizSnapshot.getThirdOrderId())
                 .set(Orders::getOrdersStatus, OrderStatusEnum.DISPATCHING.getStatus())
                 .set(Orders::getPayStatus, OrderPayStatusEnum.PAY_SUCCESS.getStatus())
                 .update();
         if(!result){
             throw new DBException("更新订单失败");
         }
-
-
-        log.info("订单支付成功，订单状态变更完毕，订单ID：{}", bizId);
+        log.info("支付成功事件，触发状态变更，开始变更：{}", bizId);
     }
 }

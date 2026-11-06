@@ -5,34 +5,54 @@ import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.jzo2o.api.customer.AddressBookApi;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
-
-@Component
+/**
+ * 服务保护组件类：保护customer的Feign调用过程
+ *
+ * @Author mr.wu
+ * @Date 2024-12-9 11:55
+ */
 @Slf4j
+@Component
 public class CustomerClient {
 
-    @Resource
+    @Autowired
     private AddressBookApi addressBookApi;
 
-    @SentinelResource(value = "getAddressBookDetail", fallback = "findAddressDetailByIdFallback", blockHandler = "getAddressBookDetailBlockHandler")
+
+    /**
+     * sentinel资源方法
+     * @param id
+     * @return
+     */
+    @SentinelResource(value = "addressDetail", fallback = "addressDetailFallback", blockHandler = "addressDetailBlockHandler")
     public AddressBookResDTO findAddressDetailById(Long id) {
-        log.info("根据id查询地址簿，id:{}", id);
-        // 调用其他微服务方法
-        AddressBookResDTO detail = addressBookApi.findById(id);
-        return detail;
+        AddressBookResDTO address = addressBookApi.findById(id);
+        log.info("[customer的feign接口]查询地址：{}" , address);
+        return address;
     }
 
-    //执行异常走
-    public AddressBookResDTO findAddressDetailByIdFallback(Long id, Throwable throwable) {
-        log.error("非限流、熔断等导致的异常执行的降级方法，id:{},throwable:", id, throwable);
+    /**
+     * 非熔断限流造成的异常而执行的降级方法
+     * @param id
+     * @param throwable
+     * @return
+     */
+    public AddressBookResDTO addressDetailFallback(Long id, Throwable throwable) {
+        log.error("[customer的feign接口]非熔断限流造成的异常而执行的降级方法", throwable);
         return null;
     }
 
-    //熔断后的降级逻辑
-    public AddressBookResDTO getAddressBookDetailBlockHandler(Long id, BlockException blockException) {
-        log.error("触发限流、熔断时执行的降级方法，id:{},blockException:", id, blockException);
+    /**
+     * 触发熔断或限流执行的降级方法
+     * @param id
+     * @param e
+     * @return
+     */
+    public AddressBookResDTO addressDetailBlockHandler(Long id, BlockException e) {
+        log.error("[customer的feign接口]触发熔断或限流执行的降级方法", e);
         return null;
     }
 }

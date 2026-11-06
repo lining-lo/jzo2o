@@ -4,6 +4,9 @@ import com.jzo2o.statemachine.core.StatusDefine;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+/**
+ * @author itcast
+ */
 @Getter
 @AllArgsConstructor
 public enum OrderStatusEnum implements StatusDefine {
@@ -11,6 +14,7 @@ public enum OrderStatusEnum implements StatusDefine {
     DISPATCHING(100, "派单中", "DISPATCHING"),
     NO_SERVE(200, "待服务", "NO_SERVE"),
     SERVING(300, "服务中", "SERVING"),
+//    NO_EVALUATION(400, "待评价", "NO_EVALUATION"),
     FINISHED(500, "已完成", "FINISHED"),
     CANCELED(600, "已取消", "CANCELED"),
     CLOSED(700, "已关闭", "CLOSED");

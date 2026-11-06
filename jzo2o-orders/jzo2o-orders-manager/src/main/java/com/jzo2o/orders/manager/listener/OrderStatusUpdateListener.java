@@ -22,17 +22,28 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * 订单状态更新的MQ消费者监听器
+ *
+ * @Author mr.wu
+ * @Date 2024-12-10 16:15
+ */
 @Slf4j
 @Component
 public class OrderStatusUpdateListener {
 
+
     @Autowired
     private TradeProperties tradeProperties;
+
     @Autowired
     private IOrdersCreateService ordersCreateService;
-    @Autowired
-    private IOrdersManagerService ordersManagerService;
 
+
+    /**
+     * 更新支付成功状态
+     * @param msg
+     */
     @RabbitListener(bindings = @QueueBinding(value = @Queue(name = MqConstants.Queues.ORDERS_TRADE_UPDATE_STATUS),
             exchange = @Exchange(name = MqConstants.Exchanges.TRADE, type = ExchangeTypes.TOPIC),
             key = MqConstants.RoutingKeys.TRADE_UPDATE_STATUS
@@ -51,35 +62,41 @@ public class OrderStatusUpdateListener {
                         && x.getStatusCode().equals(TradingStateEnum.YJS.getCode()))
                 .forEach(y -> ordersCreateService.paySuccess(y.getProductOrderNo(), y.getTransactionId(), y.getPaySuccessTime()));
 
+
         log.info("[订单状态变更]支付成功状态变更完毕>>>>>>");
     }
 
+    @Autowired
+    private IOrdersManagerService ordersManagerService;
+
     /**
-     * 未支付订单超时后自动取消
+     * 超时未支付订单自动取消
      */
     @RabbitListener(bindings = @QueueBinding(value = @Queue(name = MqConstants.Queues.ORDERS_CANCEL_QUEUE),
             exchange = @Exchange(name = MqConstants.Exchanges.ORDERS, delayed = "true"),
             key = MqConstants.RoutingKeys.ORDERS_CANCEL_KEY
     ))
-    public void listenMsgForCancel(String id) {
-        //1.判断参数是否为空
-        if (id == null) {
+    public void listenMsgForCancelNoPay(String orderIdStr) {
+        //1.判断订单ID是否为空
+        if(ObjectUtils.isNull(orderIdStr)) {
             return;
         }
 
-        //2.判断订单是否存在
-        Orders orders = ordersManagerService.getById(Long.valueOf(id));
-        if (orders == null) {
+        //2.判断订单是否为空
+        Long orderId = Long.valueOf(orderIdStr);
+        Orders orders = ordersCreateService.getById(orderId);
+        if(ObjectUtils.isNull(orders)) {
             return;
         }
 
         //3.判断订单状态是否未支付
-        if (!ObjectUtils.equals(orders.getOrdersStatus(), OrderStatusEnum.NO_PAY.getStatus())) {
+        if(ObjectUtils.notEqual(orders.getOrdersStatus(), OrderStatusEnum.NO_PAY.getStatus())) {
             return;
         }
 
-        //4.取消订单
-        ordersManagerService.cancelOrderByNoPay(orders.getId(), "超时未支付自动取消", true);
-        log.info("[订单状态变更]订单超时自动取消状态变更完毕>>>>>>");
+        //4.添加取消记录及更新订单表状态
+        ordersManagerService.cancelOrderByNoPay(orderId, "超时自动取消", true);
+
+        log.info("[超时未支付自动取消]自动取消完毕，订单id：{}", orderId);
     }
 }

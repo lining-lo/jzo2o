@@ -1,13 +1,11 @@
 package com.jzo2o.orders.manager.controller.consumer;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
 import com.jzo2o.api.orders.dto.request.OrderCancelReqDTO;
 import com.jzo2o.api.orders.dto.response.OrderResDTO;
 import com.jzo2o.api.orders.dto.response.OrderSimpleResDTO;
 import com.jzo2o.common.model.CurrentUserInfo;
 import com.jzo2o.mvc.utils.UserContext;
-import com.jzo2o.orders.manager.model.dto.OrderCancelDTO;
 import com.jzo2o.orders.manager.model.dto.request.OrdersPayReqDTO;
 import com.jzo2o.orders.manager.model.dto.request.PlaceOrderReqDTO;
 import com.jzo2o.orders.manager.model.dto.response.OrdersPayResDTO;
@@ -18,6 +16,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -33,8 +32,7 @@ public class ConsumerOrdersController {
 
     @Resource
     private IOrdersManagerService ordersManagerService;
-    @Resource
-    private IOrdersCreateService ordersCreateService;
+
 
     @GetMapping("/{id}")
     @ApiOperation("根据订单id查询")
@@ -44,7 +42,6 @@ public class ConsumerOrdersController {
     public OrderResDTO detail(@PathVariable("id") Long id) {
         return ordersManagerService.getDetail(id);
     }
-
     @GetMapping("/consumerQueryList")
     @ApiOperation("订单滚动分页查询")
     @ApiImplicitParams({
@@ -56,12 +53,15 @@ public class ConsumerOrdersController {
         return ordersManagerService.consumerQueryList(UserContext.currentUserId(), ordersStatus, sortBy);
     }
 
+    @Autowired
+    private IOrdersCreateService ordersCreateService;
+
     @ApiOperation("下单接口")
     @PostMapping("/place")
     public PlaceOrderResDTO place(@RequestBody PlaceOrderReqDTO placeOrderReqDTO) {
-        PlaceOrderResDTO placeOrderResDTO = ordersCreateService.placeOrder(placeOrderReqDTO);
-        return placeOrderResDTO;
+        return ordersCreateService.placeOrder(placeOrderReqDTO);
     }
+
 
     @PutMapping("/pay/{id}")
     @ApiOperation("订单支付")
@@ -69,9 +69,10 @@ public class ConsumerOrdersController {
             @ApiImplicitParam(name = "id", value = "订单id", required = true, dataTypeClass = Long.class)
     })
     public OrdersPayResDTO pay(@PathVariable("id") Long id, @RequestBody OrdersPayReqDTO ordersPayReqDTO) {
-        OrdersPayResDTO pay = ordersCreateService.pay(id, ordersPayReqDTO);
-        return pay;
+
+        return ordersCreateService.pay(id, ordersPayReqDTO);
     }
+
 
     @GetMapping("/pay/{id}/result")
     @ApiOperation("查询订单支付结果")
@@ -79,15 +80,14 @@ public class ConsumerOrdersController {
             @ApiImplicitParam(name = "id", value = "订单id", required = true, dataTypeClass = Long.class)
     })
     public OrdersPayResDTO payResult(@PathVariable("id") Long id) {
-        //支付结果
-        OrdersPayResDTO ordersPayResDTO = ordersCreateService.getPayResultFromTradServer(id);
-        return ordersPayResDTO;
+        return ordersCreateService.payResult(id);
     }
+
 
     @PutMapping("/cancel")
     @ApiOperation("取消订单")
-    public void cancel(@RequestBody OrderCancelReqDTO dto) {
-        ordersManagerService.cancel(dto);
+    public void cancel(@RequestBody OrderCancelReqDTO orderCancelReqDTO) {
+        ordersManagerService.cancel(orderCancelReqDTO);
     }
 
     @GetMapping("/getAvailableCoupons")
@@ -98,6 +98,17 @@ public class ConsumerOrdersController {
     })
     public List<AvailableCouponsResDTO> getCoupons(@RequestParam(value = "serveId", required = true) Long serveId,
                                                    @RequestParam(value = "purNum", required = false, defaultValue = "1") Integer purNum) {
-        return ordersCreateService.getAvailableCoupons(serveId, purNum);
+        return ordersManagerService.getCoupons(serveId, purNum);
+    }
+
+
+    @PutMapping("/hide/{id}")
+    @ApiOperation("订单删除（隐藏）")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "id", value = "订单id", required = true, dataTypeClass = Long.class)
+    })
+    public void hide(@PathVariable("id") Long id) {
+        CurrentUserInfo currentUserInfo = UserContext.currentUser();
+        ordersManagerService.hide(id, currentUserInfo.getUserType(), currentUserInfo.getId());
     }
 }

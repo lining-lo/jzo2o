@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderSnapshotDTO extends StateMachineSnapshot {
+public class OrderSnapshotDTO  extends StateMachineSnapshot {
     /**
      * 订单id
      */
@@ -56,11 +56,6 @@ public class OrderSnapshotDTO extends StateMachineSnapshot {
      * 服务项图片
      */
     private String serveItemImg;
-
-    /**
-     * 第三方支付交易号
-     */
-    private String transactionId;
 
     /**
      * 服务单位

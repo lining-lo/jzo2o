@@ -1,36 +1,40 @@
-//package com.jzo2o.orders.manager.service;
-//
-//import com.jzo2o.orders.base.config.OrderStateMachine;
-//import lombok.extern.slf4j.Slf4j;
-//import org.junit.jupiter.api.Test;
-//import org.springframework.boot.test.context.SpringBootTest;
-//
-//import javax.annotation.Resource;
-//
-//@SpringBootTest
-//@Slf4j
-//public class OrderStateMachineTest {
-//
-//    @Resource
-//    private OrderStateMachine orderStateMachine;
-//
-////    @Test
-//    public void test_start() {
-//        //启动状态机
-//        String start = orderStateMachine.start("101");
-//        log.info("返回初始状态:{}", start);
-//    }
-////    @Test
-//    public void test_changeStatus() {
-//        //状态变更
-//        orderStateMachine.changeStatus("101",OrderStatusChangeEventEnumTest.PAYED_TEST);
-//    }
-//
-////    @Test
-//    public void test_orderStatMmachine() {
-//        //启动状态机
-//        String start = orderStateMachine.start("102");
-//        //状态变更
-//        orderStateMachine.changeStatus("102",OrderStatusChangeEventEnumTest.PAYED_TEST);
-//    }
-//}
+package com.jzo2o.orders.manager.service;
+
+import com.jzo2o.orders.base.enums.OrderStatusChangeEventEnum;
+import com.jzo2o.orders.base.statemachine.OrderStateMachine;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+/**
+ * 订单状态机测试类
+ *
+ * @Author mr.wu
+ * @Date 2024-12-17 9:52
+ */
+@SpringBootTest
+public class OrderStateMachineTest {
+
+
+    @Autowired
+    private OrderStateMachine orderStateMachine;
+
+    /**
+     * 启动状态机测试
+     * 针对具体的一条业务数据，仅能启动一次状态机
+     */
+    @Test
+    public void testStartMachine(){
+        orderStateMachine.start("1234567");
+    }
+
+
+    /**
+     * 测试变更状态
+     * 指定的事件中的初始状态需要与状态机state_persister表里最新状态一致
+     */
+    @Test
+    public void testChanageStatus(){
+        orderStateMachine.changeStatus("1234567", OrderStatusChangeEventEnum.CANCEL);
+    }
+}

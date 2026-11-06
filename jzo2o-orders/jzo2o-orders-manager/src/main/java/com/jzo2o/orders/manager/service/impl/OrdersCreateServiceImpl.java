@@ -2,11 +2,8 @@ package com.jzo2o.orders.manager.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
-import com.jzo2o.api.foundations.ServeApi;
 import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
-import com.jzo2o.api.market.CouponApi;
 import com.jzo2o.api.market.dto.request.CouponUseReqDTO;
-import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
 import com.jzo2o.api.market.dto.response.CouponUseResDTO;
 import com.jzo2o.api.trade.NativePayApi;
 import com.jzo2o.api.trade.TradingApi;
@@ -23,13 +20,14 @@ import com.jzo2o.common.utils.DateUtils;
 import com.jzo2o.common.utils.IdUtils;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
-import com.jzo2o.orders.base.config.OrderStateMachine;
 import com.jzo2o.orders.base.enums.OrderPayStatusEnum;
 import com.jzo2o.orders.base.enums.OrderStatusChangeEventEnum;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
 import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
+import com.jzo2o.orders.base.service.IOrdersDiversionCommonService;
+import com.jzo2o.orders.base.statemachine.OrderStateMachine;
 import com.jzo2o.orders.manager.client.CustomerClient;
 import com.jzo2o.orders.manager.client.FoundationsClient;
 import com.jzo2o.orders.manager.client.MarketClient;
@@ -49,54 +47,33 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * <p>
  * 下单服务类
  * </p>
+ *
+ * @author itcast
+ * @since 2023-07-10
  */
 @Slf4j
 @Service
 public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> implements IOrdersCreateService {
 
-    private static final String ORDER_SERIAL_NUM_KEY = "ORDER:SERIAL:NUM";
     @Autowired
-    private RedisTemplate redisTemplate;
-    @Autowired
-    private CustomerClient customerClient;
+    private CustomerClient  customerClient;
+
     @Autowired
     private FoundationsClient foundationsClient;
+
     @Autowired
     private IOrdersCreateService owner;
-    @Autowired
-    private TradeProperties tradeProperties;
-    @Autowired
-    private NativePayApi nativePayApi;
-    @Autowired
-    private TradingApi tradingApi;
+
     @Autowired
     private RabbitClient rabbitClient;
+
     @Autowired
     private OrderStateMachine orderStateMachine;
-    @Autowired
-    private ServeApi serveApi;
-    @Autowired
-    private MarketClient marketClient;
-    @Autowired
-    private CouponApi couponApi;
-
-    /**
-     * 生成唯一订单号（yyMMdd+13位自增序号）
-     *
-     * @return
-     */
-    @Override
-    public Long generateOrderId() {
-        Long serialNum = redisTemplate.opsForValue().increment(ORDER_SERIAL_NUM_KEY);
-        Long id = DateUtils.getFormatDate(LocalDateTime.now(), "yyMMdd") * 10000000000000L + serialNum;
-        return id;
-    }
 
     /**
      * 预约下单
@@ -104,17 +81,18 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
      * @param dto
      * @return
      */
+
     @Override
     public PlaceOrderResDTO placeOrder(PlaceOrderReqDTO dto) {
         //1. 调用feign接口（foundations服务的）查询服务信息
         ServeAggregationResDTO serve = foundationsClient.findServeDetailById(dto.getServeId());
-        if (serve == null || serve.getSaleStatus() != 2) {
+        if(serve == null || serve.getSaleStatus()!=2) {
             throw new BadRequestException("非法服务");
         }
 
         //2. 调用feign接口（customer服务的）查询地址信息
         AddressBookResDTO address = customerClient.findAddressDetailById(dto.getAddressBookId());
-        if (address == null) {
+        if(address==null) {
             throw new BadRequestException("没有选择地址");
         }
 
@@ -128,6 +106,7 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         orders.setDisplay(1); //用户端是否展示，1：展示，0：隐藏，默认展示
         orders.setServeStartTime(dto.getServeStartTime());//服务开始时间
         orders.setSortBy(DateUtils.toEpochMilli(dto.getServeStartTime()) + orders.getId() % 10000); //根据服务开始时间转为毫秒时间戳+订单后5位
+
 
         //3.2 下单人信息封装
         orders.setUserId(UserContext.currentUser().getId());//下单人id
@@ -163,30 +142,102 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         orders.setRealPayAmount(orders.getTotalAmount().subtract(orders.getDiscountAmount()));//实际支付金额=订单总金额-优惠金额
 
         //4. 创建订单到订单表
-        if(ObjectUtils.isNotNull(dto.getCouponId())) {
-            owner.addWithCoupon(orders, dto.getCouponId()); //使用优惠券且创建订单
+        if(ObjectUtils.isNull(dto.getCouponId())) {
+            //第一种情况：没用优惠券，直接创建订单并启动状态机
+            owner.add(orders);
         } else {
-            owner.add(orders); //没有使用优惠券直接创建订单
+            //第二种情况：使用优惠券，先核销优惠券再创建订单并启动状态机
+            owner.addWithCoupon(orders, dto.getCouponId());
         }
 
-        //5. 生产延迟15分钟消费的消息
-        rabbitClient.sendMsg(MqConstants.Exchanges.ORDERS,
-                MqConstants.RoutingKeys.ORDERS_CANCEL_KEY,
-                orders.getId().toString(), 60000,//为了方便测试这里写了延迟60秒
-                IdUtils.getSnowflakeNextId(), false);
 
+        //5. 生产延迟时间的消息（15分钟）
+        rabbitClient.sendMsg(MqConstants.Exchanges.ORDERS,MqConstants.RoutingKeys.ORDERS_CANCEL_KEY,
+                orders.getId().toString(),
+                     60000, //这里是为了方便测试，才写60秒
+                IdUtils.getSnowflakeNextId(),
+                false);
         return new PlaceOrderResDTO(orders.getId());
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void add(Orders orders) {
+
         boolean result = this.save(orders);
+
+        //6. 启动订单状态机
+        OrderSnapshotDTO orderSnapshotDTO = BeanUtils.copyBean(orders, OrderSnapshotDTO.class);
+        orderStateMachine.start(orders.getUserId(), orders.getId().toString(), orderSnapshotDTO);
+
         if(!result) {
             throw new DBException("服务预约下单失败");
         }
-        OrderSnapshotDTO orderSnapshotDTO = BeanUtils.copyBean(orders,OrderSnapshotDTO.class);
-        orderStateMachine.start(orders.getUserId(),orders.getId().toString(), orderSnapshotDTO);
     }
+
+    @Autowired
+    private MarketClient marketClient;
+
+    /**
+     * 保存订单且核销优惠券
+     *
+     * @param orders
+     */
+    @GlobalTransactional
+    @Override
+    public void addWithCoupon(Orders orders,Long couponId) {
+        //1.准备Feign接口参数
+        CouponUseReqDTO dto = new CouponUseReqDTO();
+        dto.setId(couponId); //优惠券id
+        dto.setOrdersId(orders.getId());//订单id
+        dto.setTotalAmount(orders.getTotalAmount());//订单总金额
+
+        //2.调用Feign接口核销优惠券
+        CouponUseResDTO couponUseResDTO = marketClient.use(dto);
+        orders.setDiscountAmount(couponUseResDTO.getDiscountAmount());//设置订单优惠金额
+        orders.setRealPayAmount(orders.getTotalAmount().subtract(orders.getDiscountAmount()));//实际支付金额=订单总金额-优惠金额
+
+        //3.创建订单
+        boolean result = this.save(orders);
+
+        //4. 启动订单状态机
+        OrderSnapshotDTO orderSnapshotDTO = BeanUtils.copyBean(orders, OrderSnapshotDTO.class);
+        orderStateMachine.start(orders.getUserId(), orders.getId().toString(), orderSnapshotDTO);
+
+        if(!result) {
+            throw new DBException("服务预约下单失败");
+        }
+    }
+
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    /**
+     * 自增序列号的redisKey
+     */
+    private static final String ID_SERIAL_NUM_KEY = "ID_SERIAL_NUM_KEY";
+
+    /**
+     * 生成唯一订单ID（订单号）： 年月日+13位自增序列号，长度共计19位
+     *
+     * @return
+     */
+    @Override
+    public Long generateOrderId() {
+
+        //获取订单号的初始值：yyMMdd格式的日期
+        Long idInit = DateUtils.getFormatDate(LocalDateTime.now(), "yyMMdd") * 10000000000000L ;
+
+        //基于Redis的自增值
+        Long increment = redisTemplate.opsForValue().increment(ID_SERIAL_NUM_KEY);
+
+        return idInit + increment;
+    }
+
+    @Autowired
+    private TradeProperties tradeProperties;
+
+    @Autowired
+    private NativePayApi nativePayApi;
 
     /**
      * 订单支付
@@ -199,12 +250,12 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     public OrdersPayResDTO pay(Long id, OrdersPayReqDTO dto) {
         //1. 判断订单是否存在
         Orders orders = this.getById(id);
-        if (orders == null) {
+        if(orders==null) {
             throw new BadRequestException("订单不存在");
         }
 
         //2. 判断订单是否已支付成功（支付状态和交易单号）
-        if (ObjectUtils.equals(orders.getPayStatus(), OrderPayStatusEnum.PAY_SUCCESS.getStatus())
+        if(ObjectUtils.equals(orders.getPayStatus(),OrderPayStatusEnum.PAY_SUCCESS.getStatus())
                 && ObjectUtils.isNotNull(orders.getTradingOrderNo())) {
             OrdersPayResDTO ordersPayResDTO = BeanUtils.copyBean(orders, OrdersPayResDTO.class);
             ordersPayResDTO.setProductOrderNo(id);
@@ -219,7 +270,7 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
         //3.2 判断是否更换过支付渠道 （订单已有支付渠道，且与本次请求参数的支付渠道不一样，就算更换过）
         boolean changeChannel = false; //默认值：未更换
-        if (ObjectUtils.isNotNull(orders.getTradingChannel()) && ObjectUtils.notEqual(orders.getTradingChannel(), dto.getTradingChannel())) {
+        if(ObjectUtils.isNotNull(orders.getTradingChannel()) && ObjectUtils.notEqual(orders.getTradingChannel(), dto.getTradingChannel())) {
             changeChannel = true;
         }
 
@@ -238,12 +289,12 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         nativePayReqDTO.setTradingChannel(dto.getTradingChannel());//支付渠道
 
         NativePayResDTO nativePayResDTO = nativePayApi.createDownLineTrading(nativePayReqDTO);
-        if (ObjectUtils.isNull(nativePayResDTO)) {
+        if(ObjectUtils.isNull(nativePayResDTO)) {
             throw new BadRequestException("调用支付服务的支付接口失败");
         }
 
         //4. 更新订单表数据（支付渠道和交易单号） update orders set trading_channel=?,trading_order_no=? where id=?
-        owner.updateOrders(id, nativePayResDTO);
+        owner.updateOrders(id,nativePayResDTO);
 
         //5. 封装响应数据
         OrdersPayResDTO ordersPayResDTO = BeanUtils.copyBean(nativePayResDTO, OrdersPayResDTO.class);
@@ -252,15 +303,19 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void updateOrders(Long orderId, NativePayResDTO nativePayResDTO) {
+    public void updateOrders(Long orderId, NativePayResDTO nativePayResDTO){
         boolean result = this.lambdaUpdate().eq(Orders::getId, orderId)
                 .set(Orders::getTradingChannel, nativePayResDTO.getTradingChannel())
                 .set(Orders::getTradingOrderNo, nativePayResDTO.getTradingOrderNo())
                 .update();
-        if (!result) {
+        if(!result) {
             throw new DBException("支付失败");
         }
     }
+
+    @Autowired
+    private TradingApi tradingApi;
+
 
     /**
      * 查询订单支付结果
@@ -269,22 +324,22 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
      * @return
      */
     @Override
-    public OrdersPayResDTO getPayResultFromTradServer(Long id) {
+    public OrdersPayResDTO payResult(Long id) {
         //1.判断订单是否存在
         Orders orders = this.getById(id);
-        if (orders == null) {
+        if(orders==null) {
             throw new BadRequestException("订单不存在");
         }
 
         //2.判断是否有交易单号
-        if (ObjectUtils.isNull(orders.getTradingOrderNo())) {
+        if(ObjectUtils.isNull(orders.getTradingOrderNo())) {
             throw new BadRequestException("非法订单");
         }
 
         //3.判断是否支付成功
         OrdersPayResDTO ordersPayResDTO = BeanUtils.copyBean(orders, OrdersPayResDTO.class);
         ordersPayResDTO.setProductOrderNo(id);
-        if (ObjectUtils.equals(orders.getPayStatus(), OrderPayStatusEnum.PAY_SUCCESS.getStatus())) {
+        if(ObjectUtils.equals(orders.getPayStatus(),OrderPayStatusEnum.PAY_SUCCESS.getStatus())) {
             return ordersPayResDTO;
         }
 
@@ -293,8 +348,8 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
         //5.更新订单表信息（支付时间、第三方交易号、订单状态、支付状态）
         //update orders set pay_time=?,transaction_id=?,order_status=?,pay_status=? where id=?
-        if (ObjectUtils.isNotNull(tradingResDTO) && ObjectUtils.equals(tradingResDTO.getTradingState(), TradingStateEnum.YJS)) {
-            owner.paySuccess(id, tradingResDTO.getTransactionId(), tradingResDTO.getPaySuccessTime());
+        if(ObjectUtils.isNotNull(tradingResDTO) && ObjectUtils.equals(tradingResDTO.getTradingState(), TradingStateEnum.YJS)) {
+            owner.paySuccess(id,tradingResDTO.getTransactionId(),tradingResDTO.getPaySuccessTime());
 
             //6.封装响应数据
             ordersPayResDTO.setQrCode(tradingResDTO.getQrCode());//支付二维码图片地址
@@ -303,63 +358,23 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         return ordersPayResDTO;
     }
 
+    @Autowired
+    private IOrdersDiversionCommonService ordersDiversionCommonService;
+
+
     @Transactional(rollbackFor = Exception.class)
-    public void paySuccess(Long orderId, String transactionId, LocalDateTime payTime) {
-        //构建快照数据
+    public void paySuccess(Long orderId,String transactionId,LocalDateTime payTime) {
         OrderSnapshotDTO orderSnapshotDTO = new OrderSnapshotDTO();
-        orderSnapshotDTO.setId(orderId);
-        orderSnapshotDTO.setTransactionId(transactionId);
-        orderSnapshotDTO.setPayTime(payTime);
+        orderSnapshotDTO.setId(orderId); //业务ID：订单id
+        orderSnapshotDTO.setPayTime(payTime);//支付时间
+        orderSnapshotDTO.setThirdOrderId(transactionId);//第三方交易订单id
 
         Orders orders = this.getById(orderId);
-        //调用状态机的变更状态方法（表明触发支付成功事件）
+
+        //触发支付成功事件，变更订单状态为派单中
         orderStateMachine.changeStatus(orders.getUserId(), orderId.toString(), OrderStatusChangeEventEnum.PAYED, orderSnapshotDTO);
 
-    }
-
-    @Override
-    public List<AvailableCouponsResDTO> getAvailableCoupons(Long serveId, Integer purNum) {
-        //1. 调用feign接口（foundations服务的）查询服务信息
-        ServeAggregationResDTO serve = foundationsClient.findServeDetailById(serveId);
-        if(serve==null || serve.getSaleStatus()!=2) {
-            throw new BadRequestException("非法服务");
-        }
-
-        //2. 计算总金额
-        BigDecimal totalAmount = serve.getPrice().multiply(BigDecimal.valueOf(purNum));
-
-        //3. 调用feign接口（market服务的）获取可用优惠券列表
-        List<AvailableCouponsResDTO> couponsResDTOList = marketClient.getAvailable(totalAmount);
-        return couponsResDTOList;
-    }
-
-    /**
-     * 核销优惠券且创建订单
-     *
-     * @param orders
-     */
-    @Override
-    @GlobalTransactional
-    public void addWithCoupon(Orders orders, Long couponId) {
-
-        //4.1 调用feign接口核销优惠券
-        CouponUseReqDTO couponUseReqDto = new CouponUseReqDTO();
-        couponUseReqDto.setId(couponId);
-        couponUseReqDto.setOrdersId(orders.getId());
-        couponUseReqDto.setTotalAmount(orders.getTotalAmount());
-        CouponUseResDTO use = couponApi.use(couponUseReqDto);
-
-        //4.2 设置订单优惠金额
-        orders.setDiscountAmount(use.getDiscountAmount());
-        orders.setRealPayAmount(orders.getTotalAmount().subtract(orders.getDiscountAmount()));//实际支付金额=订单总金额-优惠金额
-        boolean result = this.save(orders);
-        if(!result) {
-            throw new DBException("服务预约下单失败");
-        }
-
-        //4.3. 启动订单状态机
-        OrderSnapshotDTO orderSnapshotDTO = BeanUtils.copyBean(orders, OrderSnapshotDTO.class);
-        orderStateMachine.start(orders.getUserId(), orders.getId().toString(), orderSnapshotDTO);
+        // 订单分流
+        ordersDiversionCommonService.diversion(orders);
     }
 }
-
