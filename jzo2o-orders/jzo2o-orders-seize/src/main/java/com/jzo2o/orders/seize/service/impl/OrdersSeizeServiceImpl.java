@@ -202,7 +202,7 @@ public class OrdersSeizeServiceImpl extends ServiceImpl<OrdersSeizeMapper, Order
         // 1.校验是否可以查询（认证通过，开启抢单）
         ServeProviderResDTO detail = serveProviderApi.getDetail(UserContext.currentUserId());
         // 验证设置状态
-        if (detail.getSettingsStatus() != 1 || !detail.getCanPickUp()) {
+        if (detail == null || !Integer.valueOf(1).equals(detail.getSettingsStatus()) || !Boolean.TRUE.equals(detail.getCanPickUp())) {
             return OrdersSeizeListResDTO.empty();
         }
         // 2.查询准备 （距离、技能，时间冲突）
@@ -211,8 +211,17 @@ public class OrdersSeizeServiceImpl extends ServiceImpl<OrdersSeizeMapper, Order
         if(ObjectUtils.isNull(ordersSerizeListReqDTO.getServeDistance())) {
             // 区域默认配置配置
             ConfigRegionInnerResDTO configRegionInnerResDTO = regionApi.findConfigRegionByCityCode(detail.getCityCode());
-            serveDistance = (detail.getType() == UserType.INSTITUTION)
-                    ? configRegionInnerResDTO.getInstitutionServeRadius().doubleValue() : configRegionInnerResDTO.getStaffServeRadius().doubleValue();
+            if (configRegionInnerResDTO == null) {
+                log.warn("未找到城市区域配置，userId={}, cityCode={}", UserContext.currentUserId(), detail.getCityCode());
+                return OrdersSeizeListResDTO.empty();
+            }
+            Integer serveRadius = detail.getType() == UserType.INSTITUTION
+                    ? configRegionInnerResDTO.getInstitutionServeRadius() : configRegionInnerResDTO.getStaffServeRadius();
+            if (serveRadius == null) {
+                log.warn("城市区域配置缺少接单半径，userId={}, cityCode={}", UserContext.currentUserId(), detail.getCityCode());
+                return OrdersSeizeListResDTO.empty();
+            }
+            serveDistance = serveRadius.doubleValue();
         }
         // 技能
         List<Long> serveItemIds = serveSkillApi.queryServeSkillListByServeProvider(UserContext.currentUserId(), UserContext.currentUser().getUserType(), detail.getCityCode());

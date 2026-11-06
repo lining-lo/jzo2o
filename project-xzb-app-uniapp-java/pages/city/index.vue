@@ -225,10 +225,6 @@ const selectCity = (city) => {
   currentCity.value = city;
   store.commit('user/setCityCode', city.cityCode);
   store.commit('user/setCityName', city.name);
-  if (process.env.VUE_APP_PLATFORM === 'h5') {
-    store.commit('user/setCityCode', data.city);
-    store.commit('user/setCityName', data.cityCode);
-  } 
   uni.navigateBack();
 };
 watch(list, () => {
