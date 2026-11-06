@@ -40,6 +40,7 @@ import com.jzo2o.orders.manager.model.dto.response.PlaceOrderResDTO;
 import com.jzo2o.orders.manager.porperties.TradeProperties;
 import com.jzo2o.orders.manager.service.IOrdersCreateService;
 import com.jzo2o.rabbitmq.client.RabbitClient;
+import io.seata.spring.annotation.GlobalTransactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -338,7 +339,7 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
      * @param orders
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @GlobalTransactional
     public void addWithCoupon(Orders orders, Long couponId) {
 
         //4.1 调用feign接口核销优惠券
