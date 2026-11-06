@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="heroTitle heroDesc">
+  <title id="heroTitle">云岚到家：家政服务 O2O 微服务平台</title>
+  <desc id="heroDesc">云岚到家连接家政需求方、服务人员、机构与平台运营，并展示从服务上架到评价售后的订单履约链路。</desc>
+  <defs>
+    <linearGradient id="heroBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FAF7F0"/>
+      <stop offset="1" stop-color="#F2EEE5"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="420" rx="28" fill="url(#heroBg)"/>
+  <path d="M0 392 C205 350 335 424 536 383 C744 340 940 402 1200 356" fill="none" stroke="#E4DED2" stroke-width="1.5"/>
+
+  <g id="title-block" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif">
+    <rect x="56" y="48" width="58" height="5" rx="2.5" fill="#E76F51"/>
+    <text x="56" y="92" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="17" letter-spacing="2.2" fill="#3D6258">SPRING CLOUD ALIBABA / O2O PLATFORM</text>
+    <text x="54" y="168" font-size="76" font-weight="760" letter-spacing="1" fill="#13231F">云岚到家</text>
+    <text x="58" y="204" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="21" font-weight="600" letter-spacing="7" fill="#7A8982">JZO2O</text>
+    <text x="56" y="246" font-size="24" fill="#34443E">连接家政需求方、服务人员、机构与平台运营</text>
+    <text x="56" y="278" font-size="24" fill="#34443E">把预约、支付、履约与售后连成一条完整链路</text>
+
+    <g id="four-clients" font-size="19" font-weight="600">
+      <rect x="56" y="310" width="82" height="40" rx="20" fill="#F8DFD6"/>
+      <text x="97" y="336" text-anchor="middle" fill="#A84830">用户端</text>
+      <rect x="148" y="310" width="108" height="40" rx="20" fill="#DCECE5"/>
+      <text x="202" y="336" text-anchor="middle" fill="#25624F">服务人员</text>
+      <rect x="266" y="310" width="82" height="40" rx="20" fill="#E1ECE8"/>
+      <text x="307" y="336" text-anchor="middle" fill="#315D51">机构端</text>
+      <rect x="358" y="310" width="82" height="40" rx="20" fill="#EEE5D6"/>
+      <text x="399" y="336" text-anchor="middle" fill="#735D3A">运营端</text>
+    </g>
+
+    <text x="56" y="386" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="17" letter-spacing="0.8" fill="#6A7871">4 个业务端  ·  9 个业务微服务  ·  1 条家政履约链路</text>
+  </g>
+
+  <g id="order-orchestration" transform="translate(638 36)">
+    <rect width="506" height="348" rx="28" fill="#17362E"/>
+    <circle cx="38" cy="42" r="10" fill="#E76F51"/>
+    <path d="M33 44 L38 38 L43 44 M35 43 V50 H41 V43" fill="none" stroke="#F8F4EB" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="58" y="49" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" letter-spacing="2" fill="#B8CAC2">ORDER ORCHESTRATION</text>
+    <text x="468" y="49" text-anchor="end" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="14" letter-spacing="1" fill="#7F9A90">FLOW / 05</text>
+    <line x1="32" y1="72" x2="474" y2="72" stroke="#315046" stroke-width="1.2"/>
+
+    <line x1="52" y1="102" x2="52" y2="300" stroke="#3D5C52" stroke-width="2" stroke-dasharray="4 7"/>
+    <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif">
+      <g>
+        <circle cx="52" cy="102" r="14" fill="#E76F51"/>
+        <text x="52" y="107" text-anchor="middle" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="12" font-weight="700" fill="#17362E">01</text>
+        <text x="84" y="109" font-size="22" font-weight="600" fill="#F8F4EB">运营配置并上架服务</text>
+      </g>
+      <g>
+        <circle cx="52" cy="151" r="14" fill="#31574A"/>
+        <text x="52" y="156" text-anchor="middle" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="12" font-weight="700" fill="#F8F4EB">02</text>
+        <text x="84" y="158" font-size="22" font-weight="600" fill="#F8F4EB">用户定位、选服务、下单</text>
+      </g>
+      <g>
+        <circle cx="52" cy="200" r="14" fill="#31574A"/>
+        <text x="52" y="205" text-anchor="middle" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="12" font-weight="700" fill="#F8F4EB">03</text>
+        <text x="84" y="207" font-size="22" font-weight="600" fill="#F8F4EB">在线支付与优惠核销</text>
+      </g>
+      <g>
+        <circle cx="52" cy="249" r="14" fill="#31574A"/>
+        <text x="52" y="254" text-anchor="middle" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="12" font-weight="700" fill="#F8F4EB">04</text>
+        <text x="84" y="256" font-size="22" font-weight="600" fill="#F8F4EB">抢单 / 派单并上门履约</text>
+      </g>
+      <g>
+        <circle cx="52" cy="298" r="14" fill="#78A9B8"/>
+        <text x="52" y="303" text-anchor="middle" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="12" font-weight="700" fill="#17362E">05</text>
+        <text x="84" y="305" font-size="22" font-weight="600" fill="#F8F4EB">完成、评价与售后</text>
+      </g>
+    </g>
+  </g>
+</svg>

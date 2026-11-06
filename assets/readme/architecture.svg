@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780" role="img" aria-labelledby="archTitle archDesc">
+  <title id="archTitle">云岚到家系统架构</title>
+  <desc id="archDesc">四个业务端通过 Nginx 与 Spring Cloud Gateway 接入九个业务微服务，并使用 Nacos、MySQL、Redis、RabbitMQ、Elasticsearch、XXL-JOB、Canal 与 Seata 等共享基础设施。</desc>
+  <rect width="1200" height="780" rx="28" fill="#F7F4ED"/>
+
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif">
+    <text x="56" y="58" font-size="40" font-weight="720" fill="#13231F">系统分层</text>
+    <text x="56" y="90" font-size="20" fill="#56665F">4 个业务端经过统一网关，落到 9 个业务微服务与共享基础设施</text>
+    <text x="1144" y="62" text-anchor="end" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="15" letter-spacing="1.8" fill="#7B8982">JZO2O / SYSTEM MAP</text>
+
+    <g id="clients-layer">
+      <text x="56" y="137" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="15" letter-spacing="1.3" fill="#8A7663">01 / CLIENTS</text>
+
+      <g>
+        <rect x="170" y="112" width="233" height="70" rx="16" fill="#FFFDF8" stroke="#DDD6C9"/>
+        <circle cx="194" cy="139" r="5" fill="#E76F51"/>
+        <text x="210" y="145" font-size="21" font-weight="650" fill="#21332D">用户端小程序</text>
+        <text x="194" y="168" font-size="16" fill="#7A8781">预约 · 支付 · 评价</text>
+      </g>
+      <g>
+        <rect x="417" y="112" width="233" height="70" rx="16" fill="#FFFDF8" stroke="#DDD6C9"/>
+        <circle cx="441" cy="139" r="5" fill="#2B7560"/>
+        <text x="457" y="145" font-size="21" font-weight="650" fill="#21332D">服务人员 App</text>
+        <text x="441" y="168" font-size="16" fill="#7A8781">认证 · 抢单 · 履约</text>
+      </g>
+      <g>
+        <rect x="664" y="112" width="233" height="70" rx="16" fill="#FFFDF8" stroke="#DDD6C9"/>
+        <circle cx="688" cy="139" r="5" fill="#2B7560"/>
+        <text x="704" y="145" font-size="21" font-weight="650" fill="#21332D">机构端 PC</text>
+        <text x="688" y="168" font-size="16" fill="#7A8781">人员 · 派单 · 订单</text>
+      </g>
+      <g>
+        <rect x="911" y="112" width="233" height="70" rx="16" fill="#FFFDF8" stroke="#DDD6C9"/>
+        <circle cx="935" cy="139" r="5" fill="#E76F51"/>
+        <text x="951" y="145" font-size="21" font-weight="650" fill="#21332D">运营管理端 PC</text>
+        <text x="935" y="168" font-size="16" fill="#7A8781">服务 · 区域 · 营销</text>
+      </g>
+
+      <path d="M286 182 V201 M533 182 V201 M780 182 V201 M1028 182 V201 M286 201 H1028 M657 201 V220" fill="none" stroke="#A8B2AC" stroke-width="1.5"/>
+      <circle cx="657" cy="220" r="4" fill="#2B7560"/>
+    </g>
+
+    <g id="access-layer">
+      <text x="56" y="255" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="15" letter-spacing="1.3" fill="#8A7663">02 / ACCESS</text>
+      <rect x="170" y="220" width="974" height="64" rx="18" fill="#17362E"/>
+      <rect x="190" y="237" width="218" height="30" rx="15" fill="#294C41"/>
+      <text x="299" y="257" text-anchor="middle" font-size="18" font-weight="600" fill="#F7F4ED">Nginx / 静态资源</text>
+      <text x="446" y="258" font-size="21" font-weight="600" fill="#F7F4ED">Spring Cloud Gateway</text>
+      <text x="692" y="258" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="17" fill="#AAC0B6">:11500</text>
+      <text x="1124" y="257" text-anchor="end" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="14" letter-spacing="1.2" fill="#86A197">TOKEN / CORS / ROUTING</text>
+      <path d="M657 284 V300" fill="none" stroke="#A8B2AC" stroke-width="1.5"/>
+      <path d="M651 295 L657 302 L663 295" fill="none" stroke="#A8B2AC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <g id="services-layer">
+      <text x="56" y="344" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="15" letter-spacing="1.3" fill="#8A7663">03 / SERVICES</text>
+      <path d="M327 307 H986 M327 307 V316 M657 307 V316 M986 307 V316" fill="none" stroke="#A8B2AC" stroke-width="1.5"/>
+
+      <g>
+        <rect x="170" y="316" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#A9CABD"/>
+        <circle cx="194" cy="343" r="5" fill="#2B7560"/>
+        <text x="210" y="349" font-size="21" font-weight="650" fill="#21332D">运营基础服务</text>
+        <text x="194" y="371" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">foundations · :11509</text>
+      </g>
+      <g>
+        <rect x="499" y="316" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#A9CABD"/>
+        <circle cx="523" cy="343" r="5" fill="#2B7560"/>
+        <text x="539" y="349" font-size="21" font-weight="650" fill="#21332D">客户中心</text>
+        <text x="523" y="371" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">customer · :11502</text>
+      </g>
+      <g>
+        <rect x="828" y="316" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#A9CABD"/>
+        <circle cx="852" cy="343" r="5" fill="#2B7560"/>
+        <text x="868" y="349" font-size="21" font-weight="650" fill="#21332D">公共服务</text>
+        <text x="852" y="371" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">publics · :11503</text>
+      </g>
+
+      <g>
+        <rect x="170" y="402" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#E5B3A5"/>
+        <circle cx="194" cy="429" r="5" fill="#E76F51"/>
+        <text x="210" y="435" font-size="21" font-weight="650" fill="#21332D">订单管理</text>
+        <text x="194" y="457" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">orders-manager · :11504</text>
+      </g>
+      <g>
+        <rect x="499" y="402" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#E5B3A5"/>
+        <circle cx="523" cy="429" r="5" fill="#E76F51"/>
+        <text x="539" y="435" font-size="21" font-weight="650" fill="#21332D">抢单服务</text>
+        <text x="523" y="457" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">orders-seize · :11506</text>
+      </g>
+      <g>
+        <rect x="828" y="402" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#E5B3A5"/>
+        <circle cx="852" cy="429" r="5" fill="#E76F51"/>
+        <text x="868" y="435" font-size="21" font-weight="650" fill="#21332D">派单调度</text>
+        <text x="852" y="457" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">orders-dispatch · :11507</text>
+      </g>
+
+      <g>
+        <rect x="170" y="488" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#ACC2CF"/>
+        <circle cx="194" cy="515" r="5" fill="#78A9B8"/>
+        <text x="210" y="521" font-size="21" font-weight="650" fill="#21332D">支付服务</text>
+        <text x="194" y="543" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">trade · :11505</text>
+      </g>
+      <g>
+        <rect x="499" y="488" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#ACC2CF"/>
+        <circle cx="523" cy="515" r="5" fill="#78A9B8"/>
+        <text x="539" y="521" font-size="21" font-weight="650" fill="#21332D">营销中心</text>
+        <text x="523" y="543" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">market · :11510</text>
+      </g>
+      <g>
+        <rect x="828" y="488" width="315" height="70" rx="16" fill="#FFFDF8" stroke="#ACC2CF"/>
+        <circle cx="852" cy="515" r="5" fill="#78A9B8"/>
+        <text x="868" y="521" font-size="21" font-weight="650" fill="#21332D">历史订单</text>
+        <text x="852" y="543" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="16" fill="#718079">orders-history · :11508</text>
+      </g>
+
+      <path d="M327 558 V580 M657 558 V580 M986 558 V580 M327 580 H986 M657 580 V612" fill="none" stroke="#A8B2AC" stroke-width="1.5"/>
+      <path d="M651 607 L657 614 L663 607" fill="none" stroke="#A8B2AC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <g id="infra-layer">
+      <text x="56" y="644" font-family="ui-monospace,'SFMono-Regular',Menlo,monospace" font-size="15" letter-spacing="1.3" fill="#8A7663">04 / INFRA</text>
+      <text x="170" y="644" font-size="18" font-weight="600" fill="#42534C">注册 / 配置 / 存储 / 消息 / 检索 / 调度 / 事务</text>
+
+      <g>
+        <rect x="170" y="656" width="233" height="52" rx="14" fill="#E9EEE9"/>
+        <text x="286" y="688" text-anchor="middle" font-size="19" font-weight="650" fill="#263A33">Nacos</text>
+      </g>
+      <g>
+        <rect x="417" y="656" width="233" height="52" rx="14" fill="#E9EEE9"/>
+        <text x="533" y="688" text-anchor="middle" font-size="19" font-weight="650" fill="#263A33">MySQL</text>
+      </g>
+      <g>
+        <rect x="664" y="656" width="233" height="52" rx="14" fill="#E9EEE9"/>
+        <text x="780" y="688" text-anchor="middle" font-size="19" font-weight="650" fill="#263A33">Redis</text>
+      </g>
+      <g>
+        <rect x="911" y="656" width="233" height="52" rx="14" fill="#E9EEE9"/>
+        <text x="1027" y="688" text-anchor="middle" font-size="19" font-weight="650" fill="#263A33">RabbitMQ</text>
+      </g>
+
+      <g>
+        <rect x="170" y="718" width="233" height="52" rx="14" fill="#E9EEE9"/>
+        <text x="286" y="750" text-anchor="middle" font-size="19" font-weight="650" fill="#263A33">Elasticsearch</text>
+      </g>
+      <g>
+        <rect x="417" y="718" width="233" height="52" rx="14" fill="#E9EEE9"/>
+        <text x="533" y="750" text-anchor="middle" font-size="19" font-weight="650" fill="#263A33">XXL-JOB</text>
+      </g>
+      <g>
+        <rect x="664" y="718" width="233" height="52" rx="14" fill="#E9EEE9"/>
+        <text x="780" y="750" text-anchor="middle" font-size="19" font-weight="650" fill="#263A33">Canal</text>
+      </g>
+      <g>
+        <rect x="911" y="718" width="233" height="52" rx="14" fill="#E9EEE9"/>
+        <text x="1027" y="750" text-anchor="middle" font-size="19" font-weight="650" fill="#263A33">Seata</text>
+      </g>
+    </g>
+  </g>
+</svg>
